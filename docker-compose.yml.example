@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  nebula:
+    # Build locally or use your custom image:
+    # image: nebula:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nebula-workspace
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Authentication token (leave empty to allow open access inside trusted VPN / LAN)
+      - NEBULA_TOKEN=seu_token_secreto_aqui_12345
+      # Allowed root directories (colon-separated, e.g. /data:/workspace or /)
+      - NEBULA_ROOTS=/data:/workspace
+      # Optional read-only protection (true / false)
+      - NEBULA_READONLY=false
+    volumes:
+      # Bind mounts to VPS host filesystem for 1Panel management:
+      - /opt/1panel/apps/nebula/data:/data
+      - /opt/1panel/apps/nebula/workspace:/workspace
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

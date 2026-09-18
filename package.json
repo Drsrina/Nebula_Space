@@ -1,0 +1,51 @@
+{
+  "name": "nebula-workspace",
+  "version": "2.7.3",
+  "description": "Nebula - 3D Spatial File Workspace & Dev Environment",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@google/genai": "^2.4.0",
+    "@monaco-editor/react": "^4.7.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "bcryptjs": "^3.0.3",
+    "diff": "^9.0.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "highlight.js": "^11.12.0",
+    "idb-keyval": "^6.3.0",
+    "isomorphic-git": "^1.42.1",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "node-cron": "^4.6.0",
+    "otplib": "^13.5.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^6.2.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/diff": "^8.0.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/node-cron": "^3.0.11",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  }
+}

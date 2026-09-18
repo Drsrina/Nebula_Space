@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #050810;
+    color: #e6f0ff;
+    overflow: hidden;
+    user-select: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Resolution & Sharpness Profiles */
+body.res-ultra-sharp {
+  -webkit-font-smoothing: antialiased;
+  filter: contrast(103%) brightness(101%);
+}
+
+body.res-retina {
+  -webkit-font-smoothing: antialiased;
+  transform: translateZ(0);
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* Custom Scrollbar for Glass Windows */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 22, 40, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 169, 255, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(94, 234, 212, 0.5);
+}
+
+/* Syntax Highlighting Styles (Dark Neon Blue matching Nebula) */
+.hljs {
+  color: #d1e4ff;
+  background: transparent;
+}
+.hljs-keyword, .hljs-selector-tag, .hljs-subst {
+  color: #3ba9ff;
+  font-weight: 600;
+}
+.hljs-string, .hljs-title, .hljs-section, .hljs-attribute, .hljs-literal, .hljs-template-tag, .hljs-template-variable, .hljs-type {
+  color: #5eead4;
+}
+.hljs-comment, .hljs-quote, .hljs-deletion {
+  color: #627d9e;
+  font-style: italic;
+}
+.hljs-number, .hljs-regexp, .hljs-link {
+  color: #6ea8ff;
+}
+.hljs-built_in, .hljs-class .hljs-title {
+  color: #93c5fd;
+}
+.hljs-function .hljs-title {
+  color: #60a5fa;
+}
+.hljs-variable, .hljs-punctuation {
+  color: #bfdbfe;
+}
+
+/* ============================================================
+   Fix 2: Isolamento de janelas inertes — cascata FORÇADA
+   
+   Quando window.depth < activeLayer (janela está à frente do degrau ativo),
+   a janela deve ser completamente não-bloqueante. Usamos o seletor de atributo
+   puro [data-inert="true"] para garantir que o Monaco Editor e qualquer outro
+   componente interno que declarar pointer-events: auto próprio seja sobrescrito.
+   O !important em cascata total é necessário porque o Monaco injeta seus próprios
+   estilos inline e via stylesheet com alta especificidade.
+   ============================================================ */
+.window-container[data-inert="true"],
+.window-container[data-inert="true"] *,
+[data-inert="true"],
+[data-inert="true"] *,
+.window-container[aria-hidden="true"],
+.window-container[aria-hidden="true"] * {
+  pointer-events: none !important;
+  user-select: none !important;
+  cursor: default !important;
+}
+
+.window-container[data-inert="false"],
+[data-inert="false"] {
+  pointer-events: auto;
+}
+
+/* ============================================================
+   Git Gutter Indicators in Monaco Margin
+   ============================================================ */
+.git-gutter-added {
+  border-left: 3.5px solid #5eead4 !important;
+  box-shadow: 0 0 6px rgba(94, 234, 212, 0.4);
+  margin-left: 2px;
+}
+
+.git-gutter-modified {
+  border-left: 3.5px solid #3ba9ff !important;
+  box-shadow: 0 0 6px rgba(59, 169, 255, 0.4);
+  margin-left: 2px;
+}
+
+.git-gutter-deleted {
+  border-left: 3.5px solid #f43f5e !important;
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.4);
+  margin-left: 2px;
+}
+
+

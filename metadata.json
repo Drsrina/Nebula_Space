@@ -1,0 +1,6 @@
+{
+  "name": "Nebula",
+  "description": "Spatial 3D workspace for local files and floating notes with 3 cognitive depth planes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

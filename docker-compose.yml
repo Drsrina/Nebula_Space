@@ -1,0 +1,60 @@
+services:
+  nebula:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nebula-workspace
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+      # ── Autenticação de Administrador ─────────────────────────────────────
+      # Senha do painel. Pode ser texto puro (simples) ou hash bcrypt (seguro).
+      - NEBULA_ADMIN_PASSWORD=${NEBULA_ADMIN_PASSWORD:-admin123}
+
+      # Usuário exibido no QR Code do autenticador (opcional)
+      - NEBULA_ADMIN_USER=${NEBULA_ADMIN_USER:-admin}
+
+      # ── MFA/TOTP ─────────────────────────────────────────────────────────
+      # Secret base32 para o Google Authenticator / Authy / etc.
+      - NEBULA_MFA_SECRET=${NEBULA_MFA_SECRET:-}
+
+      # Defina como 'true' no primeiro acesso para exibir o QR Code de setup
+      - NEBULA_MFA_SETUP=${NEBULA_MFA_SETUP:-true}
+
+      # ── JWT ───────────────────────────────────────────────────────────────
+      # Chave secreta para assinar os tokens JWT de sessão (mínimo 32 chars)
+      - NEBULA_JWT_SECRET=${NEBULA_JWT_SECRET:-troque_por_uma_string_longa_e_aleatoria_segura}
+
+      # ── Workspace ─────────────────────────────────────────────────────────
+      # Pastas permitidas no servidor (separadas por : no Linux)
+      - NEBULA_ROOTS=/data:/workspace
+
+      # Modo somente-leitura (desabilita terminal e escrita de arquivos)
+      - NEBULA_READONLY=false
+
+      # ── Gemini AI (opcional) ──────────────────────────────────────────────
+      # - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+
+    volumes:
+      # Bind mounts locais (compatíveis com Windows Docker Desktop e Linux VPS)
+      - ./data:/data
+      - ./workspace:/workspace
+      # Para suporte ao Docker Monitor (janela de containers):
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
