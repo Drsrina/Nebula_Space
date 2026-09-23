@@ -157,8 +157,8 @@ export const useWindowsStore = create<WindowsStoreState>((set, get) => ({
 
     const canvasState = useCanvasStore.getState();
     const currentCamera = canvasState.camera;
-    const currentPlane = canvasState.currentDepthPlane ?? 0;
-    const depth: DepthLevel = targetDepth !== undefined ? targetDepth : currentPlane;
+    // Padronizar spawn de novas janelas no Degrau 0
+    const depth: DepthLevel = targetDepth !== undefined ? targetDepth : 0;
 
     let defaultWidth = 420;
     let defaultHeight = 480;
@@ -266,17 +266,15 @@ export const useWindowsStore = create<WindowsStoreState>((set, get) => ({
       defaultTitle = `Live Preview${instanceSuffix}`;
     }
 
-    // Posiciona a janela centralizada no ponto de visão da câmera atual
-    const centerX = -currentCamera.x;
-    const centerY = -currentCamera.y;
-    const offset = (state.windows.length % 6) * 24;
+    // Padronizar spawn de novas janelas em (0,0) do degrau 0
+    const offset = (state.windows.length % 5) * 20;
     const newWindow: WindowData = {
       id,
       title: defaultTitle,
       type,
       depth,
-      x: Math.round(centerX - defaultWidth / 2 + offset),
-      y: Math.round(centerY - defaultHeight / 2 + offset + 28),
+      x: Math.round(-defaultWidth / 2 + offset),
+      y: Math.round(-defaultHeight / 2 + offset),
       width: defaultWidth,
       height: defaultHeight,
       zIndex: nextZ,

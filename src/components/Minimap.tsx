@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Maximize2, Minimize2, Navigation } from 'lucide
 import { useWindowsStore } from '../store/useWindowsStore';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { DepthLevel } from '../types';
+import { worldBoundsToScreen, worldToScreen } from '../lib/coordinates';
 
 const MAP_W = 160;
 const MAP_H = 110;
@@ -19,7 +20,7 @@ const depthColors: Record<number, string> = {
 
 export const Minimap: React.FC = () => {
   const { windows } = useWindowsStore();
-  const { camera, panCamera, activeLayer, setActiveLayer } = useCanvasStore();
+  const { camera, panCamera, setCameraPosition, activeLayer, setActiveLayer } = useCanvasStore();
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -46,9 +47,9 @@ export const Minimap: React.FC = () => {
       const worldX = (mx - MAP_W / 2) / SCALE_X;
       const worldY = (my - MAP_H / 2) / SCALE_Y;
 
-      panCamera(-worldX, -worldY);
+      setCameraPosition(-worldX, -worldY);
     },
-    [panCamera]
+    [setCameraPosition]
   );
 
   const handlePointerDown = useCallback(

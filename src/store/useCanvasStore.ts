@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DepthLevel } from '../types';
 import { DEPTH_Z, getCameraZForLayer } from '../lib/depth';
+import { useWindowsStore } from './useWindowsStore';
 
 interface CameraState {
   x: number;
@@ -25,6 +26,7 @@ interface CanvasStoreState {
 
   // Actions
   panCamera: (dx: number, dy: number) => void;
+  setCameraPosition: (x: number, y: number) => void;
   zoomCamera: (
     delta: number,
     zoomFactor?: number,
@@ -72,6 +74,15 @@ export const useCanvasStore = create<CanvasStoreState>()(
             ...state.camera,
             x: state.camera.x + dx,
             y: state.camera.y + dy,
+          },
+        })),
+
+      setCameraPosition: (x, y) =>
+        set((state) => ({
+          camera: {
+            ...state.camera,
+            x: Number(x.toFixed(2)),
+            y: Number(y.toFixed(2)),
           },
         })),
 
@@ -127,14 +138,48 @@ export const useCanvasStore = create<CanvasStoreState>()(
       setMouseTiltStrength: (v) =>
         set({ mouseTiltStrength: Math.max(0, Math.min(1, v)) }),
 
-      resetCamera: () =>
+      resetCamera: () => {
+        let centerX = 0;
+        let centerY = 0;
+
+        try {
+          const windows = useWindowsStore.getState().windows.filter((w) => !w.isMinimized && !w.isPopped);
+          if (windows.length > 0) {
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+
+            for (const win of windows) {
+              minX = Math.min(minX, win.x);
+              maxX = Math.max(maxX, win.x + win.width);
+              minY = Math.min(minY, win.y);
+              maxY = Math.max(maxY, win.y + win.height);
+            }
+
+            centerX = (minX + maxX) / 2;
+            centerY = (minY + maxY) / 2;
+          }
+        } catch {
+          centerX = 0;
+          centerY = 0;
+        }
+
         set({
-          camera: { ...DEFAULT_CAMERA },
+          camera: {
+            x: Number((-centerX).toFixed(2)),
+            y: Number((-centerY).toFixed(2)),
+            z: 0,
+            zoom: 1.0,
+            rotX: 0,
+            rotY: 0,
+          },
           currentDepthPlane: 0 as DepthLevel,
           activeLayer: 0 as DepthLevel,
           isFocusMode: false,
           isZToggleMode: false,
-        }),
+        });
+      },
 
       toggleFocusMode: () =>
         set((state) => ({

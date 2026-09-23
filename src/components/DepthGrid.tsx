@@ -1,4 +1,5 @@
 import React from 'react';
+import { DepthLevel } from '../types';
 import { DEPTH_CONFIGS, DEPTH_LEVELS } from '../lib/depth';
 import { useCanvasStore } from '../store/useCanvasStore';
 
