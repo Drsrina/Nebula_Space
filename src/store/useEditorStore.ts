@@ -70,6 +70,10 @@ interface EditorStoreState {
   setFontSize: (size: number) => void;
   setTheme: (theme: string) => void;
   toggleOutline: () => void;
+  closeOtherTabs: (keepPath: string) => void;
+  closeAllTabs: () => void;
+  revertFileByPath: (path: string) => void;
+  saveFileAs: (currentPath: string, newPath: string) => Promise<boolean>;
 }
 
 const INITIAL_EDITOR_TABS: EditorTab[] = [
@@ -199,6 +203,35 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
     });
   },
 
+  closeOtherTabs: (keepPath: string) => {
+    const state = get();
+    const keptTab = state.tabs.find((t) => t.filePath === keepPath);
+    if (!keptTab) return;
+    set({
+      tabs: [keptTab],
+      activeTabPath: keepPath,
+    });
+  },
+
+  closeAllTabs: () => {
+    set({
+      tabs: [],
+      activeTabPath: null,
+    });
+  },
+
+  revertFileByPath: (path: string) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.filePath === path);
+    if (!tab) return;
+    set({
+      tabs: state.tabs.map((t) =>
+        t.filePath === path ? { ...t, content: t.savedContent, isDirty: false } : t
+      ),
+    });
+    useGitStore.getState().notifyFileEdited(path, tab.savedContent);
+  },
+
   setActiveTab: (path: string) => {
     set({ activeTabPath: path });
   },
@@ -276,6 +309,44 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       }
     } catch (e) {
       console.warn('Post-save tree refresh error:', e);
+    }
+
+    return true;
+  },
+
+  saveFileAs: async (currentPath: string, newPath: string) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.filePath === currentPath);
+    if (!tab) return false;
+
+    try {
+      const adapter = adapterManager.getAdapter();
+      await adapter.writeFile(newPath, tab.content);
+    } catch (err) {
+      console.error('SaveAs error via adapter:', err);
+      return false;
+    }
+
+    const newName = newPath.split(/[/\\]/).pop() || newPath;
+    const newTab: EditorTab = {
+      filePath: newPath,
+      fileName: newName,
+      content: tab.content,
+      savedContent: tab.content,
+      isDirty: false,
+      language: detectLanguage(newName),
+    };
+
+    set({
+      tabs: [...state.tabs.filter((t) => t.filePath !== newPath), newTab],
+      activeTabPath: newPath,
+    });
+
+    try {
+      const { useFSStore } = await import('./useFSStore');
+      await useFSStore.getState().refreshTree();
+    } catch (e) {
+      console.warn('Post-saveAs tree refresh error:', e);
     }
 
     return true;

@@ -29,7 +29,13 @@ import {
   Magnet,
   Maximize2,
   Copy,
+  FilePlus,
+  RotateCcw,
+  Folder,
+  AlignLeft,
+  Hash,
 } from 'lucide-react';
+import { EditorHeader, MenuGroup } from '../EditorHeader';
 import { useEditorStore, detectLanguage } from '../../store/useEditorStore';
 import { useWindowsStore } from '../../store/useWindowsStore';
 import { useCanvasStore } from '../../store/useCanvasStore';
@@ -114,23 +120,38 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   const [saveFeedback, setSaveFeedback] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<'arquivo' | 'editar' | 'view' | 'tools' | 'help' | null>(null);
+  const [showSaveAsModal, setShowSaveAsModal] = useState(false);
+  const [saveAsPath, setSaveAsPath] = useState('');
+  const [showRevertModal, setShowRevertModal] = useState(false);
+  const [showGotoLineModal, setShowGotoLineModal] = useState(false);
+  const [gotoLineInput, setGotoLineInput] = useState('1');
+  const [lineEnding, setLineEnding] = useState<'LF' | 'CRLF'>('LF');
+  const [encoding, setEncoding] = useState<'UTF-8' | 'Latin-1'>('UTF-8');
 
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
-  const menuContainerRef = useRef<HTMLDivElement>(null);
+  const saveAsInputRef = useRef<HTMLInputElement>(null);
+  const gotoLineInputRef = useRef<HTMLInputElement>(null);
 
-  // Close menus when clicking outside
+  // Auto-focus dialog inputs
   useEffect(() => {
-    const handleDocumentClick = (e: MouseEvent) => {
-      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
-        setActiveMenu(null);
-      }
-    };
-    window.addEventListener('mousedown', handleDocumentClick);
-    return () => window.removeEventListener('mousedown', handleDocumentClick);
-  }, []);
+    if (showSaveAsModal) {
+      setTimeout(() => {
+        saveAsInputRef.current?.focus();
+        saveAsInputRef.current?.select();
+      }, 50);
+    }
+  }, [showSaveAsModal]);
+
+  useEffect(() => {
+    if (showGotoLineModal) {
+      setTimeout(() => {
+        gotoLineInputRef.current?.focus();
+        gotoLineInputRef.current?.select();
+      }, 50);
+    }
+  }, [showGotoLineModal]);
 
   // Setup Monaco Themes before mount
   const handleEditorBeforeMount: BeforeMount = (monaco) => {
@@ -150,8 +171,29 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
       globalStore.setCursorPosition(e.position.lineNumber, e.position.column);
     });
 
+    // Monaco Keybindings
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, async () => {
       await handleSave();
+    });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, () => {
+      handleOpenSaveAsDialog();
+    });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW, () => {
+      handleCloseCurrentTab();
+    });
+
+    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () => {
+      handleToggleWordWrap();
+    });
+
+    editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+      handleFormatDocument();
+    });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG, () => {
+      handleGotoLine();
     });
 
     updateGutterDecorations();
@@ -402,6 +444,172 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
     );
   };
 
+  const handleOpenSaveAsDialog = () => {
+    setSaveAsPath(activeTab?.filePath ? `${activeTab.filePath}.copy` : 'novo-arquivo.ts');
+    setShowSaveAsModal(true);
+  };
+
+  const handleSaveAs = async (newPath: string) => {
+    if (!activeTab || !newPath.trim()) return;
+    const targetPath = newPath.trim();
+    if (isCustomInstance) {
+      try {
+        const adapter = adapterManager.getAdapter();
+        await adapter.writeFile(targetPath, activeTab.content);
+        const newName = targetPath.split(/[/\\]/).pop() || targetPath;
+        const newTab: EditorTab = {
+          filePath: targetPath,
+          fileName: newName,
+          content: activeTab.content,
+          savedContent: activeTab.content,
+          isDirty: false,
+          language: detectLanguage(newName),
+        };
+        setLocalTabs((prev) => [...prev.filter((t) => t.filePath !== targetPath), newTab]);
+        setLocalActiveTabPath(targetPath);
+        setSaveFeedback(true);
+        setTimeout(() => setSaveFeedback(false), 1200);
+      } catch (err) {
+        console.error('Falha ao salvar como:', err);
+      }
+    } else {
+      const ok = await globalStore.saveFileAs(activeTab.filePath, targetPath);
+      if (ok) {
+        setSaveFeedback(true);
+        setTimeout(() => setSaveFeedback(false), 1200);
+      }
+    }
+    setShowSaveAsModal(false);
+  };
+
+  const handleRevert = () => {
+    if (!activeTab) return;
+    if (isCustomInstance) {
+      setLocalTabs((prev) =>
+        prev.map((t) =>
+          t.filePath === activeTab.filePath ? { ...t, content: t.savedContent, isDirty: false } : t
+        )
+      );
+    } else {
+      globalStore.revertFileByPath(activeTab.filePath);
+    }
+    setShowRevertModal(false);
+  };
+
+  const handleCloseCurrentTab = () => {
+    if (activeTab) {
+      handleCloseTab(activeTab.filePath);
+    }
+  };
+
+  const handleCloseOtherTabs = () => {
+    if (!activeTab) return;
+    if (isCustomInstance) {
+      setLocalTabs([activeTab]);
+      setLocalActiveTabPath(activeTab.filePath);
+    } else {
+      globalStore.closeOtherTabs(activeTab.filePath);
+    }
+  };
+
+  const handleCloseAllTabs = () => {
+    if (isCustomInstance) {
+      setLocalTabs([]);
+      setLocalActiveTabPath(null);
+    } else {
+      globalStore.closeAllTabs();
+    }
+  };
+
+  const handleShowInExplorer = () => {
+    const existing = windows.find((w) => w.type === 'file-browser');
+    if (existing) {
+      bringToFront(existing.id);
+    } else {
+      openWindow('file-browser', {}, 0);
+    }
+  };
+
+  const handleCopyFullPath = () => {
+    if (activeTab?.filePath) {
+      navigator.clipboard.writeText(activeTab.filePath);
+    }
+  };
+
+  const handleCopyRelativePath = () => {
+    if (activeTab?.fileName || activeTab?.filePath) {
+      navigator.clipboard.writeText(activeTab.fileName || activeTab.filePath);
+    }
+  };
+
+  const handleFormatDocument = () => {
+    editorRef.current?.getAction('editor.action.formatDocument')?.run();
+  };
+
+  const handleGotoLine = (lineNumber?: number) => {
+    if (lineNumber !== undefined) {
+      editorRef.current?.setPosition({ lineNumber, column: 1 });
+      editorRef.current?.revealLineInCenter(lineNumber);
+      editorRef.current?.focus();
+      setShowGotoLineModal(false);
+    } else {
+      setGotoLineInput(String(globalStore.cursorLine || 1));
+      setShowGotoLineModal(true);
+    }
+  };
+
+  const handleToggleWordWrap = () => {
+    globalStore.toggleWordWrap();
+  };
+
+  const handleToggleLineEndings = () => {
+    if (!activeTab) return;
+    const next = lineEnding === 'LF' ? 'CRLF' : 'LF';
+    setLineEnding(next);
+    let newContent = activeTab.content;
+    if (next === 'CRLF') {
+      newContent = newContent.replace(/\r?\n/g, '\r\n');
+    } else {
+      newContent = newContent.replace(/\r\n/g, '\n');
+    }
+    handleUpdateContent(activeTab.filePath, newContent);
+  };
+
+  const handleToggleEncoding = () => {
+    setEncoding((prev) => (prev === 'UTF-8' ? 'Latin-1' : 'UTF-8'));
+  };
+
+  // Global window keyboard shortcuts for editor
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modKey && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleOpenSaveAsDialog();
+      } else if (modKey && !e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSave();
+      } else if (modKey && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        handleCloseCurrentTab();
+      } else if (e.altKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleToggleWordWrap();
+      } else if (modKey && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        handleGotoLine();
+      } else if (e.shiftKey && e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        handleFormatDocument();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, lineEnding]);
+
   // Symbols outline
   const symbols = useMemo<CodeSymbol[]>(() => {
     if (!activeTab?.content) return [];
@@ -472,237 +680,245 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   const charCount = activeTab?.content ? activeTab.content.length : 0;
   const pathSegments = activeTab?.filePath ? activeTab.filePath.split(/[/\\]/) : [];
 
+  const editorMenus: MenuGroup[] = [
+    {
+      id: 'arquivo',
+      label: 'Arquivo',
+      items: [
+        {
+          id: 'new-file',
+          label: 'Novo Arquivo',
+          icon: <Plus className="w-3.5 h-3.5 text-[#5eead4]" />,
+          shortcut: 'Ctrl+N',
+          onClick: handleCreateNewTab,
+        },
+        {
+          id: 'open-local',
+          label: 'Abrir Arquivo Local...',
+          icon: <FolderOpen className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          shortcut: 'Ctrl+O',
+          onClick: handleOpenLocalFile,
+        },
+        {
+          id: 'save',
+          label: 'Salvar',
+          icon: <Save className="w-3.5 h-3.5 text-[#34d399]" />,
+          shortcut: 'Ctrl+S',
+          separator: true,
+          onClick: handleSave,
+        },
+        {
+          id: 'save-as',
+          label: 'Salvar como...',
+          icon: <FilePlus className="w-3.5 h-3.5 text-[#5eead4]" />,
+          shortcut: 'Ctrl+Shift+S',
+          onClick: handleOpenSaveAsDialog,
+        },
+        {
+          id: 'revert',
+          label: 'Reverter alterações...',
+          icon: <RotateCcw className="w-3.5 h-3.5 text-[#ff8ba7]" />,
+          disabled: !activeTab?.isDirty,
+          onClick: () => setShowRevertModal(true),
+        },
+        {
+          id: 'close-tab',
+          label: 'Fechar Aba',
+          icon: <X className="w-3.5 h-3.5" />,
+          shortcut: 'Ctrl+W',
+          separator: true,
+          danger: true,
+          onClick: handleCloseCurrentTab,
+        },
+        {
+          id: 'close-others',
+          label: 'Fechar Outras Abas',
+          icon: <X className="w-3.5 h-3.5" />,
+          disabled: tabs.length <= 1,
+          onClick: handleCloseOtherTabs,
+        },
+        {
+          id: 'close-all',
+          label: 'Fechar Todas as Abas',
+          icon: <X className="w-3.5 h-3.5" />,
+          danger: true,
+          disabled: tabs.length === 0,
+          onClick: handleCloseAllTabs,
+        },
+        {
+          id: 'show-in-explorer',
+          label: 'Mostrar no explorador',
+          icon: <Folder className="w-3.5 h-3.5 text-[#38bdf8]" />,
+          separator: true,
+          onClick: handleShowInExplorer,
+        },
+        {
+          id: 'copy-full-path',
+          label: 'Copiar caminho completo',
+          icon: <Copy className="w-3.5 h-3.5 text-[#7a92b8]" />,
+          onClick: handleCopyFullPath,
+        },
+        {
+          id: 'copy-rel-path',
+          label: 'Copiar caminho relativo',
+          icon: <Copy className="w-3.5 h-3.5 text-[#7a92b8]" />,
+          onClick: handleCopyRelativePath,
+        },
+        {
+          id: 'download',
+          label: 'Baixar Arquivo',
+          icon: <Download className="w-3.5 h-3.5 text-[#f59e0b]" />,
+          separator: true,
+          onClick: handleDownloadFile,
+        },
+      ],
+    },
+    {
+      id: 'editar',
+      label: 'Editar',
+      items: [
+        {
+          id: 'undo',
+          label: 'Desfazer',
+          icon: <Undo2 className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          shortcut: 'Ctrl+Z',
+          onClick: () => editorRef.current?.trigger('menu', 'undo', null),
+        },
+        {
+          id: 'redo',
+          label: 'Refazer',
+          icon: <Redo2 className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          shortcut: 'Ctrl+Y',
+          onClick: () => editorRef.current?.trigger('menu', 'redo', null),
+        },
+        {
+          id: 'find',
+          label: 'Localizar',
+          icon: <Search className="w-3.5 h-3.5 text-[#5eead4]" />,
+          shortcut: 'Ctrl+F',
+          separator: true,
+          onClick: () => editorRef.current?.getAction('actions.find')?.run(),
+        },
+        {
+          id: 'replace',
+          label: 'Substituir',
+          icon: <Copy className="w-3.5 h-3.5 text-[#a78bfa]" />,
+          shortcut: 'Ctrl+H',
+          onClick: () => editorRef.current?.getAction('editor.action.startFindReplaceAction')?.run(),
+        },
+        {
+          id: 'goto-line',
+          label: 'Ir para Linha...',
+          icon: <Hash className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          shortcut: 'Ctrl+G',
+          separator: true,
+          onClick: () => {
+            setGotoLineInput(String(globalStore.cursorLine || 1));
+            setShowGotoLineModal(true);
+          },
+        },
+        {
+          id: 'format-doc',
+          label: 'Formatar Documento',
+          icon: <AlignLeft className="w-3.5 h-3.5 text-[#5eead4]" />,
+          shortcut: 'Shift+Alt+F',
+          onClick: handleFormatDocument,
+        },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        {
+          id: 'word-wrap',
+          label: `Quebra de Linha (${globalStore.wordWrap ? 'Ligada' : 'Desligada'})`,
+          icon: <WrapText className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          shortcut: 'Alt+Z',
+          onClick: handleToggleWordWrap,
+        },
+        {
+          id: 'minimap',
+          label: `Minimapa (${globalStore.minimap ? 'Ligado' : 'Desligado'})`,
+          icon: <MapPin className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          onClick: () => globalStore.toggleMinimap(),
+        },
+        {
+          id: 'symbols',
+          label: `Símbolos Outline (${globalStore.showOutline ? 'Ligado' : 'Desligado'})`,
+          icon: <ListTree className="w-3.5 h-3.5 text-[#5eead4]" />,
+          onClick: () => globalStore.toggleOutline(),
+        },
+        {
+          id: 'toggle-line-endings',
+          label: `Fim de Linha: ${lineEnding} (Alternar)`,
+          icon: <Code2 className="w-3.5 h-3.5 text-[#a78bfa]" />,
+          separator: true,
+          onClick: handleToggleLineEndings,
+        },
+        {
+          id: 'toggle-encoding',
+          label: `Codificação: ${encoding} (Alternar)`,
+          icon: <FileCode className="w-3.5 h-3.5 text-[#a78bfa]" />,
+          onClick: handleToggleEncoding,
+        },
+        {
+          id: 'themes',
+          label: 'Alternar Tema...',
+          icon: <Palette className="w-3.5 h-3.5 text-[#a78bfa]" />,
+          separator: true,
+          onClick: () => setShowThemePicker(true),
+        },
+      ],
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      items: [
+        {
+          id: 'new-independent-editor',
+          label: 'Novo Editor Independente',
+          icon: <Plus className="w-3.5 h-3.5 text-[#5eead4]" />,
+          onClick: handleOpenNewIndependentEditor,
+        },
+        ...(isSnapped
+          ? [
+              {
+                id: 'unsnap',
+                label: 'Desencaixar Deste Grupo',
+                icon: <Magnet className="w-3.5 h-3.5 text-[#f59e0b]" />,
+                onClick: handleUnsnapThis,
+              },
+            ]
+          : []),
+        {
+          id: 'git-diff',
+          label: 'Comparar com Git (Diff)',
+          icon: <Split className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          separator: true,
+          onClick: handleOpenDiff,
+        },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      items: [
+        {
+          id: 'help-about',
+          label: 'Atalhos & Sobre',
+          icon: <HelpCircle className="w-3.5 h-3.5 text-[#3ba9ff]" />,
+          onClick: () => setShowHelpModal(true),
+        },
+      ],
+    },
+  ];
+
   return (
     <div className="flex flex-col h-full bg-[#050914] text-[#d1e0f5] select-text relative">
-      {/* ── Top Application Menu Bar (Arquivo, Editar, View, Tools, Help) ──── */}
-      <div
-        ref={menuContainerRef}
-        className="flex items-center gap-1 px-2 py-1 bg-[#060b17] border-b border-[#14233d] text-xs select-none relative z-30"
-      >
-        {/* Menu: Arquivo */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setActiveMenu(activeMenu === 'arquivo' ? null : 'arquivo')}
-            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              activeMenu === 'arquivo' ? 'bg-[#162744] text-[#5eead4]' : 'text-[#a3b8d7] hover:bg-[#0f1b33] hover:text-white'
-            }`}
-          >
-            Arquivo
-          </button>
-          {activeMenu === 'arquivo' && (
-            <div className="absolute left-0 top-full mt-1 w-52 bg-[#091122]/98 backdrop-blur-xl border border-[#3ba9ff]/30 rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={handleCreateNewTab}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5 text-[#5eead4]" /> Novo Arquivo</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+N</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenLocalFile}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><FolderOpen className="w-3.5 h-3.5 text-[#3ba9ff]" /> Abrir Arquivo Local...</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+O</span>
-              </button>
-              <div className="w-full h-px bg-white/5 my-0.5" />
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); handleSave(); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Save className="w-3.5 h-3.5 text-[#34d399]" /> Salvar</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+S</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadFile}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Download className="w-3.5 h-3.5 text-[#f59e0b]" /> Baixar Arquivo</span>
-              </button>
-              <div className="w-full h-px bg-white/5 my-0.5" />
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); if (activeTab) handleCloseTab(activeTab.filePath); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#ff3b5c]/20 text-[#cbd5e1] hover:text-[#ff8ba7] text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><X className="w-3.5 h-3.5" /> Fechar Aba</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+W</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Menu: Editar */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setActiveMenu(activeMenu === 'editar' ? null : 'editar')}
-            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              activeMenu === 'editar' ? 'bg-[#162744] text-[#5eead4]' : 'text-[#a3b8d7] hover:bg-[#0f1b33] hover:text-white'
-            }`}
-          >
-            Editar
-          </button>
-          {activeMenu === 'editar' && (
-            <div className="absolute left-0 top-full mt-1 w-48 bg-[#091122]/98 backdrop-blur-xl border border-[#3ba9ff]/30 rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); editorRef.current?.trigger('menu', 'undo', null); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Undo2 className="w-3.5 h-3.5 text-[#3ba9ff]" /> Desfazer</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+Z</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); editorRef.current?.trigger('menu', 'redo', null); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Redo2 className="w-3.5 h-3.5 text-[#3ba9ff]" /> Refazer</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+Y</span>
-              </button>
-              <div className="w-full h-px bg-white/5 my-0.5" />
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); editorRef.current?.getAction('actions.find')?.run(); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Search className="w-3.5 h-3.5 text-[#5eead4]" /> Localizar</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+F</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); editorRef.current?.getAction('editor.action.startFindReplaceAction')?.run(); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Copy className="w-3.5 h-3.5 text-[#a78bfa]" /> Substituir</span>
-                <span className="text-[10px] text-[#506c94] font-mono">Ctrl+H</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Menu: View */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setActiveMenu(activeMenu === 'view' ? null : 'view')}
-            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              activeMenu === 'view' ? 'bg-[#162744] text-[#5eead4]' : 'text-[#a3b8d7] hover:bg-[#0f1b33] hover:text-white'
-            }`}
-          >
-            View
-          </button>
-          {activeMenu === 'view' && (
-            <div className="absolute left-0 top-full mt-1 w-52 bg-[#091122]/98 backdrop-blur-xl border border-[#3ba9ff]/30 rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); globalStore.toggleWordWrap(); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><WrapText className="w-3.5 h-3.5 text-[#3ba9ff]" /> Quebra de Linha</span>
-                <span className="text-[10px] text-[#5eead4] font-mono">{globalStore.wordWrap ? 'ON' : 'OFF'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); globalStore.toggleMinimap(); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-[#3ba9ff]" /> Minimapa</span>
-                <span className="text-[10px] text-[#5eead4] font-mono">{globalStore.minimap ? 'ON' : 'OFF'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); globalStore.toggleOutline(); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><ListTree className="w-3.5 h-3.5 text-[#5eead4]" /> Símbolos (Outline)</span>
-                <span className="text-[10px] text-[#5eead4] font-mono">{globalStore.showOutline ? 'ON' : 'OFF'}</span>
-              </button>
-              <div className="w-full h-px bg-white/5 my-0.5" />
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); setShowThemePicker(true); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Palette className="w-3.5 h-3.5 text-[#a78bfa]" /> Alternar Tema...</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Menu: Tools */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setActiveMenu(activeMenu === 'tools' ? null : 'tools')}
-            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              activeMenu === 'tools' ? 'bg-[#162744] text-[#5eead4]' : 'text-[#a3b8d7] hover:bg-[#0f1b33] hover:text-white'
-            }`}
-          >
-            Tools
-          </button>
-          {activeMenu === 'tools' && (
-            <div className="absolute left-0 top-full mt-1 w-56 bg-[#091122]/98 backdrop-blur-xl border border-[#3ba9ff]/30 rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={handleOpenNewIndependentEditor}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5 text-[#5eead4]" /> Novo Editor Independente</span>
-              </button>
-              {isSnapped && (
-                <button
-                  type="button"
-                  onClick={handleUnsnapThis}
-                  className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#f59e0b] hover:text-white text-left transition-colors"
-                >
-                  <span className="flex items-center gap-2"><Magnet className="w-3.5 h-3.5" /> Desencaixar Deste Grupo</span>
-                </button>
-              )}
-              <div className="w-full h-px bg-white/5 my-0.5" />
-              <button
-                type="button"
-                onClick={handleOpenDiff}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><Split className="w-3.5 h-3.5 text-[#3ba9ff]" /> Comparar com Git (Diff)</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Menu: Help */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setActiveMenu(activeMenu === 'help' ? null : 'help')}
-            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-              activeMenu === 'help' ? 'bg-[#162744] text-[#5eead4]' : 'text-[#a3b8d7] hover:bg-[#0f1b33] hover:text-white'
-            }`}
-          >
-            Help
-          </button>
-          {activeMenu === 'help' && (
-            <div className="absolute left-0 top-full mt-1 w-48 bg-[#091122]/98 backdrop-blur-xl border border-[#3ba9ff]/30 rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => { setActiveMenu(null); setShowHelpModal(true); }}
-                className="flex items-center justify-between px-3 py-1.5 rounded-lg text-xs hover:bg-[#162744] text-[#cbd5e1] hover:text-white text-left transition-colors"
-              >
-                <span className="flex items-center gap-2"><HelpCircle className="w-3.5 h-3.5 text-[#3ba9ff]" /> Atalhos & Sobre</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Right side instance indicator */}
-        <div className="ml-auto flex items-center gap-2 text-[10px] text-[#506c94] font-mono">
+      {/* ── Top Application Menu Bar (EditorHeader component) ──── */}
+      <EditorHeader menus={editorMenus}>
+        <div className="flex items-center gap-2 text-[10px] text-[#506c94] font-mono">
           {isCustomInstance ? (
             <span className="px-1.5 py-0.5 rounded bg-[#3ba9ff]/15 text-[#5eead4] border border-[#3ba9ff]/30">
               Instância Independente
@@ -711,7 +927,7 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
             <span className="opacity-60">Editor Principal</span>
           )}
         </div>
-      </div>
+      </EditorHeader>
 
       {/* ── Multi-Tab Bar (Notepad++ / VS Code inspired) ──── */}
       <div className="flex items-center justify-between border-b border-[#162744] bg-[#070e1c] px-1 overflow-x-auto select-none">
@@ -978,9 +1194,17 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
       {/* ── Status Bar (Notepad++ / VS Code style) ──── */}
       <div className="h-6 bg-[#060b17] border-t border-[#14233d] px-3 flex items-center justify-between text-[11px] text-[#6b82a6] select-none font-mono">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1 text-[#a3b8d7]">
+          <button
+            type="button"
+            onClick={() => {
+              setGotoLineInput(String(globalStore.cursorLine || 1));
+              setShowGotoLineModal(true);
+            }}
+            className="flex items-center gap-1 text-[#a3b8d7] hover:text-[#5eead4] transition-colors cursor-pointer"
+            title="Ir para a Linha (Ctrl+G)"
+          >
             Lin {globalStore.cursorLine}, Col {globalStore.cursorCol}
-          </span>
+          </button>
           <span>Linhas: {lineCount}</span>
           <span>Caracteres: {charCount}</span>
           {activeTab?.isDirty ? (
@@ -996,7 +1220,22 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
 
         <div className="flex items-center gap-4">
           <span className="text-[#3ba9ff]">{activeTab?.language || 'plaintext'}</span>
-          <span>UTF-8</span>
+          <button
+            type="button"
+            onClick={handleToggleLineEndings}
+            className="hover:text-[#5eead4] transition-colors cursor-pointer"
+            title="Alternar LF / CRLF"
+          >
+            {lineEnding}
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleEncoding}
+            className="hover:text-[#5eead4] transition-colors cursor-pointer"
+            title="Alternar UTF-8 / Latin-1"
+          >
+            {encoding}
+          </button>
           <span className="text-[#5eead4]">git:({currentBranch})</span>
         </div>
       </div>
@@ -1103,6 +1342,155 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
             >
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+      {/* ── Modal: Salvar Como ──── */}
+      {showSaveAsModal && (
+        <div className="absolute inset-0 bg-[#050810]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#091122] border border-[#3ba9ff]/40 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between border-b border-[#3ba9ff]/20 pb-2">
+              <div className="flex items-center gap-2">
+                <FilePlus className="w-4 h-4 text-[#5eead4]" />
+                <span className="text-xs font-bold text-white font-mono">Salvar Arquivo Como</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSaveAsModal(false)}
+                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-[#7a92b8]">
+              Caminho ou nome do novo arquivo:
+            </p>
+            <input
+              ref={saveAsInputRef}
+              type="text"
+              value={saveAsPath}
+              onChange={(e) => setSaveAsPath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveAs(saveAsPath);
+                if (e.key === 'Escape') setShowSaveAsModal(false);
+              }}
+              className="bg-[#050810] border border-[#3ba9ff]/30 rounded-lg px-2.5 py-1.5 text-xs text-[#e6f0ff] font-mono focus:outline-none focus:border-[#5eead4]"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowSaveAsModal(false)}
+                className="px-3 py-1.5 text-xs text-[#7a92b8] hover:text-white rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveAs(saveAsPath)}
+                className="px-3 py-1.5 text-xs bg-[#3ba9ff]/20 text-[#3ba9ff] border border-[#3ba9ff]/40 hover:bg-[#3ba9ff]/30 rounded-lg transition-colors font-medium"
+              >
+                Salvar Como
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Reverter Alterações ──── */}
+      {showRevertModal && (
+        <div className="absolute inset-0 bg-[#050810]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#091122] border border-[#ff3b5c]/40 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between border-b border-[#ff3b5c]/20 pb-2">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-[#ff3b5c]" />
+                <span className="text-xs font-bold text-white font-mono">Reverter Alterações</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRevertModal(false)}
+                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-[#cbd5e1] leading-relaxed">
+              Deseja reverter todas as alterações não salvas no arquivo <strong className="text-white">{activeTab?.fileName}</strong>? Todas as edições desde o último salvamento serão descartadas.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowRevertModal(false)}
+                className="px-3 py-1.5 text-xs text-[#7a92b8] hover:text-white rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleRevert}
+                className="px-3 py-1.5 text-xs bg-[#ff3b5c]/20 text-[#ff8ba7] border border-[#ff3b5c]/40 hover:bg-[#ff3b5c]/30 rounded-lg transition-colors font-medium"
+              >
+                Reverter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Ir para a Linha ──── */}
+      {showGotoLineModal && (
+        <div className="absolute inset-0 bg-[#050810]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-xs bg-[#091122] border border-[#3ba9ff]/40 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between border-b border-[#3ba9ff]/20 pb-2">
+              <div className="flex items-center gap-2">
+                <Hash className="w-4 h-4 text-[#3ba9ff]" />
+                <span className="text-xs font-bold text-white font-mono">Ir para a Linha</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGotoLineModal(false)}
+                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-[#7a92b8]">
+              Número da linha (1 a {lineCount}):
+            </p>
+            <input
+              ref={gotoLineInputRef}
+              type="number"
+              min={1}
+              max={lineCount}
+              value={gotoLineInput}
+              onChange={(e) => setGotoLineInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const num = parseInt(gotoLineInput, 10);
+                  if (!isNaN(num)) handleGotoLine(num);
+                }
+                if (e.key === 'Escape') setShowGotoLineModal(false);
+              }}
+              className="bg-[#050810] border border-[#3ba9ff]/30 rounded-lg px-2.5 py-1.5 text-xs text-[#e6f0ff] font-mono focus:outline-none focus:border-[#5eead4]"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowGotoLineModal(false)}
+                className="px-3 py-1.5 text-xs text-[#7a92b8] hover:text-white rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const num = parseInt(gotoLineInput, 10);
+                  if (!isNaN(num)) handleGotoLine(num);
+                }}
+                className="px-3 py-1.5 text-xs bg-[#3ba9ff]/20 text-[#3ba9ff] border border-[#3ba9ff]/40 hover:bg-[#3ba9ff]/30 rounded-lg transition-colors font-medium"
+              >
+                Ir
+              </button>
+            </div>
           </div>
         </div>
       )}
