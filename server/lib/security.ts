@@ -77,7 +77,7 @@ export function validateAndResolvePath(requestedPath: string | undefined): {
   return {
     valid: false,
     resolvedPath: resolved,
-    error: `Path traversal violation: Access denied to "${requestedPath}". Path resolves outside of permitted roots (${roots.map((r) => r.path).join(', ')}).`,
+    error: `Permissão negada: Acesso restrito a "${requestedPath}". O caminho está fora dos diretórios autorizados (${roots.map((r) => r.path).join(', ')}).`,
   };
 }
 

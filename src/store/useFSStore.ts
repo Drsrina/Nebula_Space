@@ -241,6 +241,14 @@ export const useFSStore = create<FSStoreState>((set, get) => ({
       const adapter = adapterManager.getAdapter();
       const items = await adapter.listDirectory(targetPath);
 
+      // Track active root for the target path
+      const cleanTarget = targetPath.replace(/\/+$/, '');
+      const matchedRoot = state.roots.find((r) => {
+        const rp = r.path.replace(/\/+$/, '');
+        return cleanTarget === rp || cleanTarget.startsWith(rp + '/');
+      });
+      const nextActiveRoot = matchedRoot ? matchedRoot.path : state.activeRootPath;
+
       // Update active tab history
       const updatedTabs = state.tabs.map((tab) => {
         if (tab.id !== state.activeTabId) return tab;
@@ -256,6 +264,7 @@ export const useFSStore = create<FSStoreState>((set, get) => ({
 
       set({
         currentPath: targetPath,
+        activeRootPath: nextActiveRoot,
         currentItems: items,
         tabs: updatedTabs,
         totalFiles: items.length,
@@ -335,14 +344,29 @@ export const useFSStore = create<FSStoreState>((set, get) => ({
     const curr = state.currentPath.replace(/\/+$/, '');
     if (!curr || curr === '/' || curr === '.') return;
 
+    // Boundary check: if already at a configured root, do not go up into forbidden container root
+    const isAtRoot = state.roots.some((r) => r.path.replace(/\/+$/, '') === curr);
+    if (isAtRoot) return;
+
     const lastSlash = curr.lastIndexOf('/');
     const parent = lastSlash <= 0 ? '/' : curr.substring(0, lastSlash);
-    await state.navigateTo(parent);
+
+    // Validate that parent is within one of the roots
+    const validParentRoot = state.roots.find((r) => {
+      const rp = r.path.replace(/\/+$/, '');
+      return parent === rp || parent.startsWith(rp + '/');
+    });
+
+    if (validParentRoot) {
+      await state.navigateTo(parent);
+    } else if (state.activeRootPath) {
+      await state.navigateTo(state.activeRootPath);
+    }
   },
 
   goHome: async () => {
     const state = get();
-    const home = state.roots[0]?.path || '/';
+    const home = state.activeRootPath || state.roots[0]?.path || '/';
     await state.navigateTo(home);
   },
 

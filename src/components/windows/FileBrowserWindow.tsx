@@ -30,9 +30,11 @@ import {
   ExternalLink,
   ChevronDown,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 import { useFSStore } from '../../store/useFSStore';
 import { useWindowsStore } from '../../store/useWindowsStore';
+import { useCanvasStore } from '../../store/useCanvasStore';
 import { useEditorStore } from '../../store/useEditorStore';
 import { formatBytes } from '../../lib/fs';
 import { FSNodeItem } from '../../lib/adapters';
@@ -145,21 +147,42 @@ export const FileBrowserWindow: React.FC = () => {
     setPathInput(currentPath);
   }, [currentPath]);
 
-  // Breadcrumb segments calculation
+  // Breadcrumb segments calculation (distinguishes configured roots as entry points from subpaths)
   const breadcrumbs = useMemo(() => {
     const clean = currentPath.replace(/\/+$/, '');
-    if (!clean || clean === '/') return [{ name: '/', path: '/' }];
+    const matchedRoot = roots.find((r) => {
+      const rp = r.path.replace(/\/+$/, '');
+      return clean === rp || clean.startsWith(rp + '/');
+    });
 
-    const parts = clean.split('/').filter(Boolean);
-    const crumbs = [{ name: '/', path: '/' }];
-    let acc = '';
+    if (!matchedRoot) {
+      if (!clean || clean === '/') return [{ name: '/', path: '/' }];
+      const parts = clean.split('/').filter(Boolean);
+      const crumbs = [{ name: '/', path: '/' }];
+      let acc = '';
+      for (const part of parts) {
+        acc += '/' + part;
+        crumbs.push({ name: part, path: acc });
+      }
+      return crumbs;
+    }
 
-    for (const part of parts) {
-      acc += '/' + part;
-      crumbs.push({ name: part, path: acc });
+    // Inside a matched root entry point:
+    const rootPathClean = matchedRoot.path.replace(/\/+$/, '');
+    const rootDisplayName = matchedRoot.name.replace(/\s*\(.*\)$/, '').trim() || rootPathClean.split('/').filter(Boolean).pop() || rootPathClean;
+    const crumbs = [{ name: rootDisplayName, path: matchedRoot.path }];
+
+    const relativeSub = clean.slice(rootPathClean.length).replace(/^\/+/, '');
+    if (relativeSub) {
+      const subParts = relativeSub.split('/').filter(Boolean);
+      let acc = rootPathClean;
+      for (const part of subParts) {
+        acc += '/' + part;
+        crumbs.push({ name: part, path: acc });
+      }
     }
     return crumbs;
-  }, [currentPath]);
+  }, [currentPath, roots]);
 
   // Filtered and sorted items
   const displayItems = useMemo(() => {
@@ -770,17 +793,17 @@ export const FileBrowserWindow: React.FC = () => {
             </div>
           ) : errorMessage ? (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-              <div className="p-3 rounded-full bg-[#ff5c7a]/15 text-[#ff5c7a] mb-2">
-                <Trash2 className="w-6 h-6" />
+              <div className="p-3 rounded-full bg-[#ff5c7a]/15 text-[#ff5c7a] mb-2 border border-[#ff5c7a]/30">
+                <ShieldAlert className="w-8 h-8" />
               </div>
-              <p className="text-sm font-semibold text-[#ff5c7a] mb-1">Erro de acesso</p>
+              <p className="text-sm font-semibold text-[#ff5c7a] mb-1">Permissão Negada / Erro de Acesso</p>
               <p className="text-xs text-[#7a92b8] max-w-md mb-4">{errorMessage}</p>
               <button
                 type="button"
                 onClick={goHome}
-                className="px-3 py-1.5 bg-[#3ba9ff]/20 hover:bg-[#3ba9ff]/30 text-[#5eead4] text-xs rounded-lg font-medium transition-all"
+                className="px-3.5 py-1.5 bg-[#3ba9ff]/20 hover:bg-[#3ba9ff]/30 text-[#5eead4] text-xs rounded-lg font-medium transition-all border border-[#3ba9ff]/40 shadow-sm"
               >
-                Retornar à Raiz
+                Retornar ao local permitido
               </button>
             </div>
           ) : displayItems.length === 0 ? (
