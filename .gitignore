@@ -7,3 +7,7 @@ coverage/
 .env*
 !.env.example
 data/
+
+# Pasta do VS Code (não rastrear no repositório)
+vscode-main/
+n8n-master/
