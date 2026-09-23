@@ -510,9 +510,25 @@ export const useWindowsStore = create<WindowsStoreState>((set, get) => ({
   },
 
   unsnapWindow: (id: string) => {
-    const newWindows = get().windows.map((w) =>
-      w.id === id ? { ...w, snapGroup: undefined } : w
-    );
+    const current = get().windows;
+    const target = current.find((w) => w.id === id);
+    if (!target || !target.snapGroup) return;
+
+    const group = target.snapGroup;
+    const othersInGroup = current.filter((w) => w.snapGroup === group && w.id !== id);
+
+    const newWindows = current.map((w) => {
+      if (w.id === id) {
+        // Disconnect target window without altering its visual x/y coordinates
+        return { ...w, snapGroup: undefined };
+      }
+      // If only 1 other window remains in this group, it cannot form a group by itself
+      if (othersInGroup.length === 1 && w.snapGroup === group) {
+        return { ...w, snapGroup: undefined };
+      }
+      return w;
+    });
+
     set({ windows: newWindows });
     saveWindowsToStorage(newWindows);
   },

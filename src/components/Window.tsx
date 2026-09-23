@@ -86,6 +86,7 @@ export const Window: React.FC<WindowProps> = ({ window: win }) => {
     restoreWindow,
     openDuplicateWindow,
     snapWindows,
+    unsnapWindow,
     moveSnapGroup,
     windows,
     markPopped,
