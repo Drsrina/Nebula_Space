@@ -25,7 +25,12 @@ interface CanvasStoreState {
 
   // Actions
   panCamera: (dx: number, dy: number) => void;
-  zoomCamera: (delta: number, zoomFactor?: number) => void;
+  zoomCamera: (
+    delta: number,
+    zoomFactor?: number,
+    cursorScreenPos?: { x: number; y: number },
+    viewportSize?: { width: number; height: number }
+  ) => void;
   setMouseTilt: (rotX: number, rotY: number) => void;
   resetCamera: () => void;
   toggleFocusMode: () => void;
@@ -70,13 +75,39 @@ export const useCanvasStore = create<CanvasStoreState>()(
           },
         })),
 
-      zoomCamera: (delta, zoomFactor = 0.001) =>
+      zoomCamera: (delta, zoomFactor = 0.001, cursorScreenPos, viewportSize) =>
         set((state) => {
-          const newZoom = Math.min(Math.max(state.camera.zoom - delta * zoomFactor, 0.45), 2.2);
+          const oldZoom = state.camera.zoom;
+          const newZoom = Number(
+            Math.min(Math.max(oldZoom - delta * zoomFactor, 0.45), 2.2).toFixed(3)
+          );
+
+          if (newZoom === oldZoom) return state;
+
+          if (cursorScreenPos && viewportSize && viewportSize.width > 0 && viewportSize.height > 0) {
+            const centerX = viewportSize.width / 2;
+            const centerY = viewportSize.height / 2;
+            const offsetX = cursorScreenPos.x - centerX;
+            const offsetY = cursorScreenPos.y - centerY;
+
+            const factor = 1 / newZoom - 1 / oldZoom;
+            const newX = Number((state.camera.x + offsetX * factor).toFixed(2));
+            const newY = Number((state.camera.y + offsetY * factor).toFixed(2));
+
+            return {
+              camera: {
+                ...state.camera,
+                x: newX,
+                y: newY,
+                zoom: newZoom,
+              },
+            };
+          }
+
           return {
             camera: {
               ...state.camera,
-              zoom: Number(newZoom.toFixed(3)),
+              zoom: newZoom,
             },
           };
         }),

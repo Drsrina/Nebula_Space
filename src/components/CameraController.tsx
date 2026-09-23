@@ -116,7 +116,7 @@ export const CameraController: React.FC = () => {
       <div className="flex items-center gap-1 bg-[#070e1c]/80 backdrop-blur-xl border border-[#3ba9ff]/20 rounded-xl p-1 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
         <button
           type="button"
-          onClick={() => zoomCamera(120)}
+          onClick={() => zoomCamera(-120)}
           className="p-2 text-[#7a92b8] hover:text-[#5eead4] hover:bg-[#3ba9ff]/15 rounded-lg transition-colors cursor-pointer"
           title="Aproximar Câmera (Zoom In)"
         >
@@ -125,7 +125,7 @@ export const CameraController: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => zoomCamera(-120)}
+          onClick={() => zoomCamera(120)}
           className="p-2 text-[#7a92b8] hover:text-[#5eead4] hover:bg-[#3ba9ff]/15 rounded-lg transition-colors cursor-pointer"
           title="Afastar Câmera (Zoom Out)"
         >

@@ -31,7 +31,12 @@ export const Canvas3D: React.FC = () => {
     }
   }, [initWindows, isInitialized]);
 
-  // Global keyboard shortcuts for switching activeLayer directly (1, 2, 3 and Escape)
+  const lastMousePosRef = useRef<{ x: number; y: number }>({
+    x: typeof window !== 'undefined' ? window.innerWidth / 2 : 500,
+    y: typeof window !== 'undefined' ? window.innerHeight / 2 : 400,
+  });
+
+  // Global keyboard shortcuts for switching activeLayer directly (1, 2, 3 and Escape) and zooming (+ / -)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept if user is typing in a textarea, input or Monaco editor
@@ -61,12 +66,24 @@ export const Canvas3D: React.FC = () => {
       } else if (e.key === 'Escape' || e.key === '0' || e.code === 'Digit0' || e.code === 'Numpad0') {
         e.preventDefault();
         setActiveLayer(0);
+      } else if ((e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') && !e.altKey) {
+        e.preventDefault();
+        const rect = containerRef.current?.getBoundingClientRect();
+        const viewportSize = rect ? { width: rect.width, height: rect.height } : { width: window.innerWidth, height: window.innerHeight };
+        const cursorScreenPos = rect ? { x: lastMousePosRef.current.x - rect.left, y: lastMousePosRef.current.y - rect.top } : lastMousePosRef.current;
+        zoomCamera(-100, 0.001, cursorScreenPos, viewportSize);
+      } else if ((e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') && !e.altKey) {
+        e.preventDefault();
+        const rect = containerRef.current?.getBoundingClientRect();
+        const viewportSize = rect ? { width: rect.width, height: rect.height } : { width: window.innerWidth, height: window.innerHeight };
+        const cursorScreenPos = rect ? { x: lastMousePosRef.current.x - rect.left, y: lastMousePosRef.current.y - rect.top } : lastMousePosRef.current;
+        zoomCamera(100, 0.001, cursorScreenPos, viewportSize);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveLayer]);
+  }, [setActiveLayer, zoomCamera]);
 
   // ── WASD Camera Navigation ────────────────────────────────────────────────
   // Ativo apenas quando nenhuma janela está focada (activeWindowId === null ou
@@ -141,6 +158,8 @@ export const Canvas3D: React.FC = () => {
   // Handle subtle mouse tilt (±10° on X/Y based on cursor distance from screen center)
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
       // If user is panning, don't jerk the tilt
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -161,7 +180,7 @@ export const Canvas3D: React.FC = () => {
     [setMouseTilt]
   );
 
-  // Wheel to Zoom
+  // Wheel to Zoom (centered on cursor position)
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
       // Don't zoom if scrolling inside any window body (editor, tree, diff, etc.)
@@ -187,7 +206,21 @@ export const Canvas3D: React.FC = () => {
       }
 
       e.preventDefault();
-      zoomCamera(e.deltaY, 0.0008);
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      const viewportSize = rect
+        ? { width: rect.width, height: rect.height }
+        : { width: window.innerWidth, height: window.innerHeight };
+
+      const cursorScreenPos = rect
+        ? { x: e.clientX - rect.left, y: e.clientY - rect.top }
+        : { x: e.clientX, y: e.clientY };
+
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+      // Adjust zoom factor for trackpad pinch vs mouse wheel
+      const zoomFactor = e.ctrlKey ? 0.003 : 0.0008;
+      zoomCamera(e.deltaY, zoomFactor, cursorScreenPos, viewportSize);
     },
     [zoomCamera]
   );
@@ -262,6 +295,7 @@ export const Canvas3D: React.FC = () => {
       className="relative w-full h-full overflow-hidden select-none cursor-crosshair"
       style={{
         perspective: '3000px', // Necessário para hit-testing do degrau 2 — ver v0.1.3 para não regredir
+        perspectiveOrigin: '50% 50%',
         backgroundColor: '#050810',
         backgroundImage: `radial-gradient(circle at 50% 50%, #0d1a33 0%, #070e1c 55%, #050810 100%)`,
       }}
@@ -284,6 +318,7 @@ export const Canvas3D: React.FC = () => {
         className="w-full h-full relative will-change-transform pointer-events-none"
         style={{
           transformStyle: 'preserve-3d',
+          transformOrigin: '50% 50%',
           pointerEvents: 'none',
           transform: `
             translate3d(${camera.x}px, ${camera.y}px, ${camera.z}px)
