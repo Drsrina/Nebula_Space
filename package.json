@@ -1,6 +1,6 @@
 {
   "name": "nebula-workspace",
-  "version": "2.7.3",
+  "version": "2.7.5",
   "description": "Nebula - 3D Spatial File Workspace & Dev Environment",
   "license": "GPL-3.0-only",
   "type": "module",
