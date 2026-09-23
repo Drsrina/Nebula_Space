@@ -34,6 +34,7 @@ import {
 import { useFSStore } from '../store/useFSStore';
 import { useWindowsStore } from '../store/useWindowsStore';
 import { useCanvasStore } from '../store/useCanvasStore';
+import { usePaletteStore } from '../store/usePaletteStore';
 import { DepthLevel } from '../types';
 import { HubDropdown } from './HubDropdown';
 import { clearAuthToken } from '../lib/api';
@@ -93,10 +94,15 @@ export const TopBar: React.FC = () => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
-      // Ctrl+P → Quick Open / Command Palette
-      if (modKey && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+      // Ctrl+Shift+P → Command Palette (Comandos e Ações)
+      if (modKey && e.key.toLowerCase() === 'p' && e.shiftKey) {
         e.preventDefault();
-        open('launcher', 0);
+        usePaletteStore.getState().openPalette('commands');
+      }
+      // Ctrl+P → Quick Open / Busca de Arquivos
+      else if (modKey && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+        e.preventDefault();
+        usePaletteStore.getState().openPalette('files');
       }
       // Ctrl+Shift+F → Busca Global
       else if (modKey && e.shiftKey && e.key.toLowerCase() === 'f') {
@@ -231,7 +237,7 @@ export const TopBar: React.FC = () => {
       label: 'Command Palette',
       icon: <Sparkles className="w-4 h-4 text-[#fbbf24]" />,
       shortcut: '⌃P',
-      onClick: () => open('launcher'),
+      onClick: () => usePaletteStore.getState().openPalette('files'),
     },
     {
       id: 'newnote',

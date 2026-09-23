@@ -5,6 +5,7 @@ import { CameraController } from './components/CameraController';
 import { ActiveLayerIndicator } from './components/ActiveLayerIndicator';
 import { Minimap } from './components/Minimap';
 import { FullScreenLoginGate } from './components/FullScreenLoginGate';
+import { CommandPaletteOverlay } from './components/CommandPaletteOverlay';
 import { useFSStore } from './store/useFSStore';
 import { useCanvasStore } from './store/useCanvasStore';
 import { getAuthToken } from './lib/api';
@@ -98,6 +99,9 @@ export default function App() {
 
       {/* Canvas Minimap */}
       <Minimap />
+
+      {/* Fixed Viewport Command Palette Modal */}
+      <CommandPaletteOverlay />
 
       {/* Error alert toast if file system access fails */}
       {errorMessage && (
