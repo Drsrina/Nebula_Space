@@ -292,23 +292,13 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       ),
     });
 
-    // Notify FSStore to refresh tree and preview
-    try {
-      const { useFSStore } = await import('./useFSStore');
-      await useFSStore.getState().refreshTree();
-
-      const { useWindowsStore } = await import('./useWindowsStore');
-      const winStore = useWindowsStore.getState();
-      if (winStore.filePreview && winStore.filePreview.filePath === path) {
-        winStore.openFilePreview({
-          ...winStore.filePreview,
-          content: tab.content,
-          size: new Blob([tab.content]).size,
-          lastModified: Date.now(),
-        });
-      }
-    } catch (e) {
-      console.warn('Post-save tree refresh error:', e);
+    // Dispatch decoupled custom event to notify listeners (FS tree refresh, preview update)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('nebula_file_saved', {
+          detail: { path, content: tab.content },
+        })
+      );
     }
 
     return true;
@@ -342,11 +332,12 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       activeTabPath: newPath,
     });
 
-    try {
-      const { useFSStore } = await import('./useFSStore');
-      await useFSStore.getState().refreshTree();
-    } catch (e) {
-      console.warn('Post-saveAs tree refresh error:', e);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('nebula_file_saved', {
+          detail: { path: newPath, content: tab.content },
+        })
+      );
     }
 
     return true;

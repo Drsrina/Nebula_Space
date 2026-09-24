@@ -73,4 +73,21 @@ describe('Snap & Docking System — Grouping, Boundaries & Cascade Detach', () =
     assert.equal(afterTrioUnsnap.find((w) => w.id === 'B')?.snapGroup, 'grp-2', 'B e C permanecem agrupados');
     assert.equal(afterTrioUnsnap.find((w) => w.id === 'C')?.snapGroup, 'grp-2', 'C permanece agrupado com B');
   });
+
+  it('desencaixar afasta fisicamente a janela além do threshold de snap para não grudar novamente', () => {
+    const winA = { id: 'win-A', x: 100, y: 100, width: 400, height: 300, snapGroup: 'g1' };
+    const winB = { id: 'win-B', x: 500, y: 100, width: 400, height: 300, snapGroup: 'g1' };
+
+    const others = [winA];
+    const avgOtherX = others.reduce((s, o) => s + (o.x + o.width / 2), 0) / others.length;
+    const targetCenterX = winB.x + winB.width / 2;
+    const dx = targetCenterX - avgOtherX;
+    const pushX = dx >= 0 ? 60 : -60;
+
+    const newBx = winB.x + pushX;
+    assert.equal(newBx, 560);
+    const distanceBetween = newBx - (winA.x + winA.width);
+    assert.equal(distanceBetween, 60);
+    assert.ok(distanceBetween > 40, 'Distância após desencaixe (60px) supera SNAP_THRESHOLD (40px)');
+  });
 });

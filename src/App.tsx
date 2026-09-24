@@ -8,6 +8,7 @@ import { FullScreenLoginGate } from './components/FullScreenLoginGate';
 import { CommandPaletteOverlay } from './components/CommandPaletteOverlay';
 import { useFSStore } from './store/useFSStore';
 import { useCanvasStore } from './store/useCanvasStore';
+import { useWindowsStore } from './store/useWindowsStore';
 import { getAuthToken } from './lib/api';
 import { Info, X, Loader2 } from 'lucide-react';
 
@@ -56,8 +57,29 @@ export default function App() {
       setIsAuthenticated(false);
     };
 
+    const handleFileSaved = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      useFSStore.getState().refreshTree();
+      if (detail?.path) {
+        const { windows, openFilePreview } = useWindowsStore.getState();
+        const previewWin = windows.find((w) => w.type === 'file-preview');
+        if (previewWin && (previewWin.payload as any)?.filePath === detail.path) {
+          openFilePreview({
+            ...(previewWin.payload as any),
+            content: detail.content,
+            size: new Blob([detail.content || '']).size,
+            lastModified: Date.now(),
+          });
+        }
+      }
+    };
+
     window.addEventListener('nebula_logout', handleLogoutEvent);
-    return () => window.removeEventListener('nebula_logout', handleLogoutEvent);
+    window.addEventListener('nebula_file_saved', handleFileSaved);
+    return () => {
+      window.removeEventListener('nebula_logout', handleLogoutEvent);
+      window.removeEventListener('nebula_file_saved', handleFileSaved);
+    };
   }, [initFS]);
 
   // Loading Splash while determining authentication status

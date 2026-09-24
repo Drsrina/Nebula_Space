@@ -69,7 +69,7 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
 
   // Global Editor store
   const globalStore = useEditorStore();
-  const { openWindow, windows, unsnapWindow } = useWindowsStore();
+  const { openWindow, windows, unsnapWindow, bringToFront } = useWindowsStore();
   const { currentBranch, getFileBaseContent } = useGitStore();
 
   // Local independent state if this is a duplicated or secondary editor instance
@@ -259,7 +259,6 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   };
 
   const handleOpenLocalFile = async () => {
-    setActiveMenu(null);
     try {
       if ('showOpenFilePicker' in window) {
         // @ts-expect-error showOpenFilePicker is standard in Chrome/Edge
@@ -334,7 +333,6 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   };
 
   const handleCreateNewTab = () => {
-    setActiveMenu(null);
     const newFileName = `rascunho-${Date.now().toString().slice(-4)}.txt`;
     const newTab: EditorTab = {
       filePath: newFileName,
@@ -390,7 +388,6 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   };
 
   const handleDownloadFile = () => {
-    setActiveMenu(null);
     if (!activeTab) return;
     const blob = new Blob([activeTab.content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -402,7 +399,6 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   };
 
   const handleOpenNewIndependentEditor = () => {
-    setActiveMenu(null);
     const draftId = Date.now().toString().slice(-4);
     openWindow('editor', {
       tabs: [
@@ -423,12 +419,10 @@ export const EditorWindow: React.FC<EditorWindowProps> = ({ windowId, payload })
   const isSnapped = Boolean(currentWindowData?.snapGroup);
 
   const handleUnsnapThis = () => {
-    setActiveMenu(null);
     if (windowId) unsnapWindow(windowId);
   };
 
   const handleOpenDiff = () => {
-    setActiveMenu(null);
     if (!activeTab) return;
     const oldContent = getFileBaseContent(activeTab.filePath);
     openWindow(

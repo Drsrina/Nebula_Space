@@ -30,9 +30,12 @@ import {
   Split,
   FileImage,
   LogOut,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { useFSStore } from '../store/useFSStore';
 import { useWindowsStore } from '../store/useWindowsStore';
+import { exportWorkspaceBackup, importWorkspaceBackup } from '../lib/workspaceBackup';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { usePaletteStore } from '../store/usePaletteStore';
 import { DepthLevel } from '../types';
@@ -72,6 +75,22 @@ export const TopBar: React.FC = () => {
   } = useFSStore();
 
   const { createNote, resetLayout, openWindow } = useWindowsStore();
+  const backupInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const res = await importWorkspaceBackup(text);
+      alert(res.message);
+    } catch (err: any) {
+      alert(`Erro ao importar workspace: ${err?.message || 'Arquivo inválido'}`);
+    } finally {
+      if (backupInputRef.current) backupInputRef.current.value = '';
+    }
+  };
+
   const {
     isFocusMode,
     toggleFocusMode,
@@ -253,6 +272,18 @@ export const TopBar: React.FC = () => {
       onClick: () => open('settings-global'),
     },
     {
+      id: 'export-backup',
+      label: 'Exportar Workspace (.nebula.json)',
+      icon: <Download className="w-4 h-4 text-[#3ba9ff]" />,
+      onClick: () => exportWorkspaceBackup(),
+    },
+    {
+      id: 'import-backup',
+      label: 'Importar Workspace (.nebula.json)',
+      icon: <Upload className="w-4 h-4 text-[#5eead4]" />,
+      onClick: () => backupInputRef.current?.click(),
+    },
+    {
       id: 'reset',
       label: 'Resetar Layout',
       icon: <RotateCcw className="w-4 h-4 text-[#7a92b8]" />,
@@ -272,6 +303,13 @@ export const TopBar: React.FC = () => {
 
   return (
     <header className="absolute top-4 left-4 right-4 z-50 pointer-events-none flex items-center justify-between gap-3">
+      <input
+        ref={backupInputRef}
+        type="file"
+        accept=".json,.nebula.json"
+        onChange={handleImportBackup}
+        className="hidden"
+      />
 
       {/* Left: Brand + Folder Info */}
       <div className="flex items-center gap-2.5 pointer-events-auto flex-shrink-0">
@@ -283,7 +321,7 @@ export const TopBar: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold tracking-widest text-[#e6f0ff] uppercase">Nebula</span>
             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#3ba9ff]/15 text-[#3ba9ff] border border-[#3ba9ff]/25">
-              v2.5
+              v2.7.6
             </span>
           </div>
         </div>

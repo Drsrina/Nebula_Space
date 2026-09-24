@@ -9,13 +9,14 @@ const STORAGE_KEYS = {
   CAMERA: 'nebula_camera_state_v1',
 };
 
-let saveWindowsTimeout: number | undefined;
+let saveWindowsTimeout: any = undefined;
 
 export function saveWindowsToStorage(windows: WindowData[]): void {
+  if (typeof indexedDB === 'undefined') return;
   if (saveWindowsTimeout !== undefined) {
     clearTimeout(saveWindowsTimeout);
   }
-  saveWindowsTimeout = window.setTimeout(async () => {
+  saveWindowsTimeout = setTimeout(async () => {
     try {
       // Sanitize and avoid saving non-serializable objects in window payload
       const serializable = windows.map((w, idx) => {
@@ -41,6 +42,7 @@ export function saveWindowsToStorage(windows: WindowData[]): void {
 }
 
 export async function clearAllWindowsStorage(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
   try {
     await del(STORAGE_KEYS.WINDOWS);
     await del(STORAGE_KEYS.WINDOWS_LEGACY);
@@ -50,6 +52,7 @@ export async function clearAllWindowsStorage(): Promise<void> {
 }
 
 export async function loadWindowsFromStorage(): Promise<WindowData[] | null> {
+  if (typeof indexedDB === 'undefined') return null;
   try {
     let data = await get<any[]>(STORAGE_KEYS.WINDOWS);
     if (!data || !Array.isArray(data) || data.length === 0) {
@@ -92,6 +95,7 @@ export async function loadWindowsFromStorage(): Promise<WindowData[] | null> {
 }
 
 export async function saveNotesToStorage(notes: SavedNote[]): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
   try {
     await set(STORAGE_KEYS.NOTES, notes);
   } catch (err) {
@@ -100,6 +104,7 @@ export async function saveNotesToStorage(notes: SavedNote[]): Promise<void> {
 }
 
 export async function loadNotesFromStorage(): Promise<SavedNote[]> {
+  if (typeof indexedDB === 'undefined') return [];
   try {
     const data = await get<SavedNote[]>(STORAGE_KEYS.NOTES);
     return data || [];

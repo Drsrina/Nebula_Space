@@ -441,6 +441,7 @@ export const Window: React.FC<WindowProps> = ({ window: win }) => {
       case 'launcher':
         return <LauncherWindow />;
       case 'settings':
+      case 'settings-global':
         return <SettingsWindow />;
       case 'terminal':
         return <TerminalWindow />;

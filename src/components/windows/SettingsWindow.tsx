@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Server,
   Shield,
@@ -14,10 +14,15 @@ import {
   Monitor,
   LogOut,
   Sparkles,
+  Download,
+  Upload,
+  Database,
+  FileJson,
 } from 'lucide-react';
 import { useFSStore } from '../../store/useFSStore';
 import { useWindowsStore } from '../../store/useWindowsStore';
 import { clearAuthToken } from '../../lib/api';
+import { exportWorkspaceBackup, importWorkspaceBackup } from '../../lib/workspaceBackup';
 
 export const SettingsWindow: React.FC = () => {
   const {
@@ -54,6 +59,56 @@ export const SettingsWindow: React.FC = () => {
   const handleLogout = () => {
     clearAuthToken();
     window.dispatchEvent(new CustomEvent('nebula_logout'));
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  const handleExportBackup = async () => {
+    setIsExporting(true);
+    setBackupStatus(null);
+    const ok = await exportWorkspaceBackup();
+    setIsExporting(false);
+    if (ok) {
+      setBackupStatus({
+        success: true,
+        message: 'Arquivo .nebula.json gerado e baixado com sucesso!',
+      });
+      setTimeout(() => setBackupStatus(null), 4000);
+    } else {
+      setBackupStatus({
+        success: false,
+        message: 'Falha ao gerar o arquivo de backup.',
+      });
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    setBackupStatus(null);
+    try {
+      const text = await file.text();
+      const res = await importWorkspaceBackup(text);
+      setBackupStatus(res);
+      if (res.success) {
+        setTimeout(() => setBackupStatus(null), 5000);
+      }
+    } catch (err: any) {
+      setBackupStatus({
+        success: false,
+        message: `Falha ao ler arquivo: ${err?.message || 'Arquivo corrompido'}`,
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const [baseUrl, setBaseUrl] = useState(remoteConfig.baseUrl || '');
@@ -342,6 +397,73 @@ export const SettingsWindow: React.FC = () => {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Backup & Migração de Workspace (.nebula.json) */}
+      <div className="mt-4 p-4 rounded-xl bg-[#0a1628]/60 border border-[#5eead4]/25 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-[#5eead4]" />
+            <div>
+              <div className="text-xs font-semibold text-[#e6f0ff] flex items-center gap-1.5">
+                <span>Backup & Migração de Workspace</span>
+                <span className="text-[10px] font-mono text-[#5eead4] bg-[#5eead4]/15 px-1.5 py-0.5 rounded border border-[#5eead4]/30">
+                  .nebula.json
+                </span>
+              </div>
+              <div className="text-[11px] text-[#7a92b8]">
+                Exporte ou restaure todo o estado (janelas 3D, notas do IndexedDB, abas e configurações) em um único arquivo.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 pt-1">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.nebula.json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+
+          <button
+            type="button"
+            onClick={handleExportBackup}
+            disabled={isExporting}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#3ba9ff]/15 hover:bg-[#3ba9ff]/25 border border-[#3ba9ff]/35 text-[#3ba9ff] hover:text-[#5eead4] text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Download className={`w-3.5 h-3.5 ${isExporting ? 'animate-bounce' : ''}`} />
+            <span>{isExporting ? 'Exportando...' : 'Exportar Workspace (.nebula.json)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#5eead4]/15 hover:bg-[#5eead4]/25 border border-[#5eead4]/35 text-[#5eead4] text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Upload className={`w-3.5 h-3.5 ${isImporting ? 'animate-spin' : ''}`} />
+            <span>{isImporting ? 'Restaurando...' : 'Importar Backup (.nebula.json)'}</span>
+          </button>
+        </div>
+
+        {backupStatus && (
+          <div
+            className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 font-mono ${
+              backupStatus.success
+                ? 'bg-[#5eead4]/10 border-[#5eead4]/30 text-[#5eead4]'
+                : 'bg-[#ff5c7a]/10 border-[#ff5c7a]/30 text-[#ff5c7a]'
+            }`}
+          >
+            {backupStatus.success ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-[#5eead4]" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 shrink-0 text-[#ff5c7a]" />
+            )}
+            <span>{backupStatus.message}</span>
+          </div>
+        )}
       </div>
 
       {/* Sessão e Logout */}

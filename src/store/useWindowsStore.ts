@@ -515,10 +515,41 @@ export const useWindowsStore = create<WindowsStoreState>((set, get) => ({
     const group = target.snapGroup;
     const othersInGroup = current.filter((w) => w.snapGroup === group && w.id !== id);
 
+    // Calculate displacement away from the group beyond SNAP_THRESHOLD (40px)
+    // so it doesn't immediately stick or re-snap on micro-movement
+    let pushX = 0;
+    let pushY = 0;
+    if (othersInGroup.length > 0) {
+      const avgOtherX =
+        othersInGroup.reduce((sum, o) => sum + (o.x + o.width / 2), 0) /
+        othersInGroup.length;
+      const avgOtherY =
+        othersInGroup.reduce((sum, o) => sum + (o.y + o.height / 2), 0) /
+        othersInGroup.length;
+      const targetCenterX = target.x + target.width / 2;
+      const targetCenterY = target.y + target.height / 2;
+
+      const dx = targetCenterX - avgOtherX;
+      const dy = targetCenterY - avgOtherY;
+
+      const SEPARATION = 60; // 60px > 40px SNAP_THRESHOLD
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        pushX = dx >= 0 ? SEPARATION : -SEPARATION;
+      } else {
+        pushY = dy >= 0 ? SEPARATION : -SEPARATION;
+      }
+    } else {
+      pushX = 60;
+    }
+
     const newWindows = current.map((w) => {
       if (w.id === id) {
-        // Disconnect target window without altering its visual x/y coordinates
-        return { ...w, snapGroup: undefined };
+        return {
+          ...w,
+          x: w.x + pushX,
+          y: w.y + pushY,
+          snapGroup: undefined,
+        };
       }
       // If only 1 other window remains in this group, it cannot form a group by itself
       if (othersInGroup.length === 1 && w.snapGroup === group) {
