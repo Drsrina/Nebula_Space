@@ -28,56 +28,63 @@ One of Nebula’s core architectural strengths is its spatial interaction engine
 
 Nebula provides an extensive suite of built-in windows designed for every stage of development:
 
-### 1. 📝 Multi-Tab Code Editor (`EditorWindow`) — *Plane 0 (Focus)*
+### 1. 📝 Advanced Multi-Tab Code Editor (`EditorWindow`) — *Plane 0 (Focus)*
 - Full **Monaco Editor** with custom neon themes (`nebula-dark`, `tokyo-night`, `one-dark-pro`, `dracula-neon`).
-- **Complete Application Menu Bar**:
-  - **File**: *New File (`Ctrl+N`)*, *Open Local File... (`Ctrl+O` via File System Access API)*, *Save (`Ctrl+S`)*, *Download*, *Close Tab (`Ctrl+W`)*.
+- **Complete Application Menu Bar & Advanced Actions**:
+  - **File**: *New File (`Ctrl+N`)*, *Open Local File... (`Ctrl+O`)*, *Save (`Ctrl+S`)*, **Save As...**, **Revert File**, **Line Ending Toggle (LF / CRLF)**, *Download*, *Close Tab (`Ctrl+W`)*.
   - **Edit**: *Undo (`Ctrl+Z`)*, *Redo (`Ctrl+Y`)*, *Find (`Ctrl+F`)*, *Replace (`Ctrl+H`)*.
   - **View**: *Word Wrap*, *Minimap*, *Symbol Outline Drawer*, *Switch Theme...*.
   - **Tools**: *Open New Independent Editor*, *Unsnap Window*, *Compare with Git (Diff)*.
-  - **Help**: *Keyboard Shortcuts & About*.
 - **Completely Independent Instances**: Duplicated or secondary editors maintain decoupled local state and isolated buffers without cross-instance leakage.
 - **Real-time Git Gutter**: Visual gutter indicators (green for additions, amber for modifications, red for deletions) calculated live against `HEAD`.
 - **Hierarchical Breadcrumbs Bar**: Shows active path hierarchy with interactive navigation.
 - **Symbol Outline Drawer**: Extracts functions, classes, interfaces, and variables with 1-click line jumping.
 
-### 2. 🔒 Full-Screen Authentication Gate (`FullScreenLoginGate`)
-- Secure, full-screen authentication shield covering 100% of the viewport on initial load.
-- Completely locks down the 3D canvas and tools until credentials are provided, preventing unauthorized viewing or access over the web.
-- **Default Credentials**: Username `admin` / Password `admin123`.
-- Supports **TOTP Two-Factor Authentication (MFA)** with QR code provisioning and backup verification.
-- **Session Logout**: Instantly clears JWT tokens and restores the full-screen lock.
+### 2. ⚡ Universal Command Palette & Quick Open (`LauncherWindow`) — *Shortcut `Ctrl+P` / `Ctrl+K`*
+- Instantly accessible anywhere using `Ctrl+P` or `Ctrl+K`.
+- **Quick Open Mode (`Ctrl+P`)**: Instant fuzzy file search across your entire workspace with 1-click jump into Monaco.
+- **Action & Window Launcher (`Ctrl+K`)**: Rapidly open specialized tools, toggle operational modes (Local vs VPS), switch spatial layout presets, and reset the 3D camera.
+- Full keyboard-driven navigation with shortcut badges.
 
-### 3. 💻 Integrated Terminal (`TerminalWindow`) — *Plane 2*
-- Local shell execution via backend `/api/terminal/exec`.
-- Command history navigation ($\uparrow$ / $\downarrow$).
-- Quick controls: `Ctrl+C` (interrupt), `Ctrl+L` / `clear` (clear screen).
-- Fully honors the server-side `NEBULA_READONLY` security guardrail.
+### 3. 📌 Spatial Notes & Multi-Format Export (`NoteWindow`) — *Plane 2*
+- Rich Markdown note editor with instant live preview, code highlighting, and interactive task checklists.
+- **1-Click Multi-Format Exporting**:
+  - **HTML**: Clean, styled standalone HTML document ready for external viewing.
+  - **PDF**: Print-optimized stylesheet for clean reporting and archiving.
+  - **Markdown (.md)**: Raw markdown file download.
+- Visual categorization via vibrant neon tags (cyan, purple, blue, amber, green, red).
+- Real-time word and character statistics.
 
-### 4. 🐙 Git Panel & Forgejo / Gitea / GitHub (`GitPanelWindow`) — *Plane 1*
-- **Local Git Workflows**:
-  - Live change detection (modified, untracked, deleted files).
-  - Quick actions: **Stage (+)**, **Unstage (-)**, Discard Changes, Commit with author & timestamp.
-  - Branch checkout and creation with ahead/behind status tracking.
-  - Commit history timeline with 1-click commit diff inspection.
-- **Forgejo / Gitea / Codeberg / GitHub Integration**:
-  - Connect your remote Git instance via server URL and personal access token.
-  - Live listing of remote repositories, open/closed Issues, and Pull Requests.
+### 4. 🎛️ 3D Spatial Layout Presets (Saved Workspaces)
+- Instant 1-click switching between curated spatial window layouts across the 3 cognitive depth planes:
+  - **Preset "Coding"**: Monaco Editor focused on Plane 0, Diff on Plane 1, Git Panel on Plane 2.
+  - **Preset "Review / Notes"**: Side-by-side Notes on Plane 0, File Browser on Plane 1.
+  - **Preset "Full Stack"**: Code Editor on Plane 0, Interactive Terminal on Plane 1, Docker Monitor on Plane 2.
+- Smooth camera transitions with precise damping (lerp) running at a fluid 60 FPS.
 
-### 5. ⚡ Mini-n8n Workflow Automation (`WorkflowWindow`)
-- Visual node-based workflow builder for running multi-step automation pipelines.
-- **Nodes Supported**:
-  - *Trigger* (Manual or Webhook endpoint)
-  - *Code-Box* (Isolated JS sandbox or native Python execution)
-  - *Condition* (Boolean expression evaluation with True/False branching)
-  - *HTTP Request* (External API calling with method, headers, and body)
-  - *Log* (Output inspector)
-- **Live SSE Streaming**: Real-time execution logs streamed over Server-Sent Events.
-- **Webhook Activation**: Trigger automated flows externally via `/api/workflows/webhook/:webhookId`.
+### 5. 💻 Interactive Web Terminal (xterm.js + WebSocket / PTY) — *Plane 2*
+- Real PTY terminal session connected directly to container shell (`/bin/bash` or `sh`).
+- Full support for interactive CLI tools (`htop`, `vim`, `nano`, `git`, `npm`, `python`).
+- Command history, hotkeys (`Ctrl+C`, `Ctrl+L`), and dynamic window resize syncing.
 
-### 6. ⏱️ Crontab Scheduler (`CrontabWindow`)
-- Visual schedule manager for recurring maintenance, automated tests, and background jobs.
-- Standard 5-field cron syntax validation with next-run previews.
+### 6. 🔄 Mini-Workflows & Integrated Crontab Automation
+- Visual node-based pipeline builder with chained data flow.
+- **Trigger Node**: Manual trigger or automated execution scheduled via **Crontab**.
+- **HTTP Request Node**: Full REST API caller (GET, POST, PUT, DELETE) passing JSON payloads downstream.
+- **Code-Box Node (Python / JavaScript)**: Execute custom logic and script transformations with input/output payloads.
+- Live streaming execution logs via Server-Sent Events (SSE).
+
+### 7. 📦 Task Runner & Scripts with Auto-Discovery
+- Process and script dashboard with real-time detection of active processes and `package.json` scripts.
+- Includes a sample onboarding script `timestamp-logger.js` automatically generated for rapid testing.
+
+### 8. 🛡️ Enterprise Security, MFA/2FA & Global Settings
+- **Full-Screen Authentication Gate (`FullScreenLoginGate`)**: Blocks unauthorized web viewing of the 3D canvas before login.
+- **Global Settings Security Panel**:
+  - **Admin Password Change**: Change password on-the-fly with persistent `/data/auth-config.json` storage (no container restarts needed).
+  - **Two-Factor Authentication (TOTP / MFA)**: Crisp QR Code generation for Google Authenticator, Authy, Microsoft Authenticator, and 1Password, with 6-digit confirmation.
+  - **Device Revocation & Safe MFA Disabling**: Requires confirmation with current admin password.
+  - **Path Traversal Protection (`NEBULA_ROOTS`)**: Strict file isolation to authorized root paths.
 - Execution history with exit codes, timestamps, and live log view.
 - Path traversal protection and sandboxed execution.
 
@@ -221,17 +228,14 @@ Log in using:
 
 ### Docker & Docker Compose (Recommended)
 
-Nebula is production-ready for self-hosting on VPS, home servers, or container dashboards (**1Panel**, **Portainer**, **Coolify**).
+Nebula is production-ready for self-hosting on VPS, home servers, or container dashboards (**1Panel**, **Portainer**, **Coolify**). A fully-documented template is available at the repository root (`docker-compose.yml`):
 
-1. Copy the Docker Compose file:
 ```bash
-cp docker-compose.yml.example docker-compose.yml
+docker compose up -d --build
 ```
 
-2. Customize `docker-compose.yml`:
+Example `docker-compose.yml`:
 ```yaml
-version: "3.8"
-
 services:
   nebula:
     build:
@@ -244,22 +248,36 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - NEBULA_PASSWORD=your_strong_password_here
       - NEBULA_ADMIN_PASSWORD=your_strong_password_here
-      - NEBULA_ROOTS=/data:/workspace
+      - NEBULA_ADMIN_USER=admin
+      - NEBULA_MFA_SETUP=true
+      - NEBULA_JWT_SECRET=replace_with_a_secure_random_string_min_32_characters
+      - NEBULA_ROOTS=/:/workspace:/data
       - NEBULA_READONLY=false
-      # Optional: Google Gemini API Key for AI Assistant
-      - GEMINI_API_KEY=your_gemini_api_key_here
     volumes:
-      - /host/path/to/data:/data
-      - /host/path/to/workspace:/workspace
+      # Persistent configuration, notes, changed credentials, auth-config.json
+      - ./data:/data
+      # Primary workspace code volume
+      - ./workspace:/workspace
 ```
 
-3. Build and run:
-```bash
-docker compose up -d --build
-```
+---
 
-Access your instance at `http://YOUR_SERVER_IP:3000`.
+## 🔒 Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP port on which the Express server listens. |
+| `NODE_ENV` | `development` | Runtime environment (`development` or `production`). |
+| `NEBULA_PASSWORD` / `NEBULA_ADMIN_PASSWORD` | `admin123` | Master password for administrator access (supports plain text or bcrypt hash). |
+| `NEBULA_ADMIN_USER` | `admin` | Username displayed in TOTP authenticator issuer. |
+| `NEBULA_MFA_SETUP` | `true` | Enables MFA/2FA generation and setup inside Global Settings. |
+| `NEBULA_MFA_SECRET` | *Empty* | Pre-defined base32 TOTP secret (optional; can be generated via UI). |
+| `NEBULA_JWT_SECRET` | *Default* | Secret key for signing session JWT tokens (minimum 32 characters). |
+| `NEBULA_ROOTS` | `/:/workspace:/data` | Colon-separated list of allowed root directories to prevent path traversal. |
+| `NEBULA_READONLY` | `false` | When `true`, prevents all file write, creation, deletion, and shell execution. |
+| `GEMINI_API_KEY` | *Optional* | Google Gemini API key for the AI coding assistant. |
 
 ---
 

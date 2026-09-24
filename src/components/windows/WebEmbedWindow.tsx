@@ -23,11 +23,11 @@ export const WebEmbedWindow: React.FC<WebEmbedWindowProps> = ({ payload }) => {
     let normalized = url.trim();
     if (!normalized) return;
     if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
-      // Check if it's a URL-like or a search query
+      // Se não parece um domínio com ponto ou tem espaço, usa busca amigável a embeds
       if (normalized.includes('.') && !normalized.includes(' ')) {
         normalized = 'https://' + normalized;
       } else {
-        normalized = `https://www.google.com/search?q=${encodeURIComponent(normalized)}`;
+        normalized = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(normalized)}`;
       }
     }
     setActiveUrl(normalized);
@@ -60,17 +60,19 @@ export const WebEmbedWindow: React.FC<WebEmbedWindowProps> = ({ payload }) => {
 
   const reload = () => {
     if (iframeRef.current) {
-      iframeRef.current.src = activeUrl;
+      const target = useProxy ? `/api/proxy/web?url=${encodeURIComponent(activeUrl)}` : activeUrl;
+      iframeRef.current.src = target;
       setIsLoading(true);
     }
   };
 
   const SHORTCUTS = [
+    { label: 'DuckDuckGo', url: 'https://html.duckduckgo.com' },
+    { label: 'DevDocs.io', url: 'https://devdocs.io' },
+    { label: 'MDN Web Docs', url: 'https://developer.mozilla.org/pt-BR' },
+    { label: 'Wikipedia', url: 'https://pt.wikipedia.org' },
     { label: 'GitHub', url: 'https://github.com' },
-    { label: 'MDN', url: 'https://developer.mozilla.org/pt-BR' },
-    { label: 'Docs', url: 'https://docs.nebula.dev' },
     { label: 'npm', url: 'https://npmjs.com' },
-    { label: 'Can I Use', url: 'https://caniuse.com' },
   ];
 
   return (

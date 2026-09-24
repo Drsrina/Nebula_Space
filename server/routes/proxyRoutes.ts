@@ -98,45 +98,92 @@ async function validateUrlAndDNS(urlString: string): Promise<{ error?: string; s
  * removendo cabeçalhos restritivos de framing (X-Frame-Options/CSP) e injetando <base>.
  */
 proxyRouter.get('/web', async (req: Request, res: Response) => {
-  const targetUrl = req.query.url as string;
-  if (!targetUrl) {
+  const initialUrl = req.query.url as string;
+  if (!initialUrl) {
     res.status(400).send('Parâmetro "url" é obrigatório.');
     return;
   }
 
-  const validation = await validateUrlAndDNS(targetUrl);
-  if (validation.error) {
-    res.status(validation.status || 403).send(`Acesso negado: ${validation.error}`);
-    return;
-  }
+  let currentUrl = initialUrl;
+  let response: any = null;
+  const MAX_REDIRECTS = 3;
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    const response = await fetch(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
+      const validation = await validateUrlAndDNS(currentUrl);
+      if (validation.error) {
+        res.status(validation.status || 403).send(`Acesso negado: ${validation.error}`);
+        return;
+      }
 
-    const contentType = response.headers.get('content-type') || 'text/html';
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      try {
+        response = await fetch(currentUrl, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          },
+          redirect: 'manual',
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      // Se for redirecionamento, segue para o próximo salto
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get('location');
+        if (location) {
+          currentUrl = new URL(location, currentUrl).href;
+          continue;
+        }
+      }
+
+      break;
+    }
+
+    if (!response) {
+      res.status(502).send('Falha ao obter resposta do destino.');
+      return;
+    }
+
+    const contentType = response.headers.get('content-type') || 'text/html; charset=utf-8';
     let body = await response.text();
 
-    // Injeta tag <base> para links e assets relativos funcionarem no iframe
     if (contentType.includes('text/html')) {
-      const baseTag = `<base href="${targetUrl}">`;
+      const baseTag = `<base href="${currentUrl}">`;
+      const antiBustScript = `
+        <script>
+          try {
+            // Neutraliza frame-busting de sites legados
+            window.onbeforeunload = null;
+            Object.defineProperty(window, 'top', { get: function() { return window.self; } });
+            Object.defineProperty(window, 'parent', { get: function() { return window.self; } });
+          } catch(e) {}
+        </script>
+      `;
+
       if (body.includes('<head>')) {
-        body = body.replace('<head>', `<head>${baseTag}`);
+        body = body.replace('<head>', `<head>${baseTag}${antiBustScript}`);
       } else {
-        body = `${baseTag}${body}`;
+        body = `${baseTag}${antiBustScript}${body}`;
       }
     }
 
-    res.setHeader('Content-Type', contentType);
+    // Remove todos os cabeçalhos que impedem exibição em iframe
     res.removeHeader('X-Frame-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('Content-Security-Policy-Report-Only');
+    res.removeHeader('Cross-Origin-Opener-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+    res.removeHeader('X-Content-Type-Options');
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Security-Policy', "frame-ancestors *;");
     res.status(response.status).send(body);
   } catch (err: any) {

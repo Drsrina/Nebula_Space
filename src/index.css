@@ -129,4 +129,59 @@ body.res-retina {
   margin-left: 2px;
 }
 
+/* ============================================================
+   Global Themes System (Dark, Light, Custom)
+   ============================================================ */
+:root {
+  --nebula-accent: #5eead4;
+  --nebula-accent-glow: rgba(94, 234, 212, 0.4);
+  --nebula-accent-border: rgba(94, 234, 212, 0.3);
+  --nebula-accent-rgb: 94, 234, 212;
+}
 
+/* Light Theme Mode */
+body.theme-light {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+body.theme-light .window-container {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(203, 213, 225, 0.9) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  color: #0f172a !important;
+}
+
+body.theme-light .window-header {
+  background-color: #f8fafc !important;
+  border-bottom-color: rgba(226, 232, 240, 0.9) !important;
+  color: #0f172a !important;
+}
+
+body.theme-light .window-header span {
+  color: #0f172a !important;
+}
+
+body.theme-light .top-bar-hud {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  color: #0f172a !important;
+}
+
+body.theme-light .top-bar-hud span,
+body.theme-light .top-bar-hud button {
+  color: #334155;
+}
+
+body.theme-light ::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8);
+}
+
+body.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+body.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}

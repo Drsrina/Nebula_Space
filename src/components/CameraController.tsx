@@ -3,11 +3,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Layers,
   Compass,
   Focus,
-  Eye,
-  ArrowRightLeft,
 } from 'lucide-react';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useWindowsStore } from '../store/useWindowsStore';
@@ -16,12 +13,9 @@ import { DepthLevel } from '../types';
 export const CameraController: React.FC = () => {
   const {
     camera,
-    currentDepthPlane,
-    activeLayer,
     setActiveLayer,
     zoomCamera,
     resetCamera,
-    jumpToDepthPlane,
     isFocusMode,
     toggleFocusMode,
   } = useCanvasStore();
@@ -73,44 +67,6 @@ export const CameraController: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* 3D Spatial Plane Jump Selector */}
-      <div className="flex items-center bg-[#070e1c]/90 backdrop-blur-xl border border-[#3ba9ff]/30 rounded-xl p-1 shadow-[0_4px_25px_rgba(0,0,0,0.6)] text-xs text-[#7a92b8]">
-        <div className="hidden md:flex items-center gap-1 px-2 text-[10px] font-mono text-[#7a92b8] border-r border-[#3ba9ff]/20 mr-1">
-          <Eye className="w-3 h-3 text-[#3ba9ff]" />
-          <span>Plano:</span>
-        </div>
-
-        {([0, 1, 2] as DepthLevel[]).map((depth) => {
-          const isCurrent = currentDepthPlane === depth;
-          const labels = ['0 Foco', '1 Contexto', '2 Arquivo'];
-          const zDesc = ['Z = 0px', 'Z = -400px', 'Z = -800px'];
-          return (
-            <button
-              key={depth}
-              type="button"
-              onClick={() => jumpToDepthPlane(depth)}
-              className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                isCurrent
-                  ? depth === 0
-                    ? 'bg-[#3ba9ff] text-[#050810] shadow-[0_0_15px_rgba(59,169,255,0.6)] font-bold'
-                    : depth === 1
-                    ? 'bg-[#5eead4] text-[#050810] shadow-[0_0_15px_rgba(94,234,212,0.6)] font-bold'
-                    : 'bg-[#6ea8ff] text-[#050810] shadow-[0_0_15px_rgba(110,168,255,0.6)] font-bold'
-                  : 'text-[#7a92b8] hover:text-[#e6f0ff] hover:bg-[#3ba9ff]/15'
-              }`}
-              title={`Focar câmera no Degrau ${depth} (${labels[depth]}, ${zDesc[depth]})`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isCurrent ? 'bg-[#050810]' : 'bg-[#3ba9ff]/40'
-                }`}
-              />
-              <span>{labels[depth]}</span>
-            </button>
-          );
-        })}
-      </div>
 
       {/* Camera Tools Widget */}
       <div className="flex items-center gap-1 bg-[#070e1c]/80 backdrop-blur-xl border border-[#3ba9ff]/20 rounded-xl p-1 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">

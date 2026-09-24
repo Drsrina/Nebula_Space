@@ -1,3 +1,19 @@
+# ==============================================================================
+# Nebula Workspace v2.8.1 - Docker Compose Template Pronto para Produção & VPS
+# ==============================================================================
+#
+# Modo Padrão (Ultra-Leve para VPS Pequenas de 1GB - 2GB RAM):
+#   - Sobe apenas o container principal com Node 22 e Python 3 nativos integrados.
+#   - Comando: docker compose up -d
+#
+# Modo com Runners Isolados Opcionais (Sidecars Python & Node/TS):
+#   - Sobe containers dedicados para isolar a execução de scripts e automações pesadas.
+#   - Comando: docker compose --profile runners up -d
+#
+# Acesso: http://localhost:3000 (ou http://seu-ip:3000)
+# Credenciais Padrão: admin / admin123
+# ==============================================================================
+
 services:
   nebula:
     build:
@@ -5,46 +21,42 @@ services:
       dockerfile: Dockerfile
     container_name: nebula-workspace
     restart: unless-stopped
+
+    # Mapeamento de portas (Host:Container)
     ports:
       - "3000:3000"
+
     environment:
       - NODE_ENV=production
       - PORT=3000
 
-      # ── Autenticação de Administrador ─────────────────────────────────────
-      # Senha do painel. Pode ser texto puro (simples) ou hash bcrypt (seguro).
+      # ── Autenticação & Senhas ─────────────────────────────────────────────
+      # Senha mestra inicial. Pode ser alterada no painel de Configurações Globais.
+      - NEBULA_PASSWORD=${NEBULA_PASSWORD:-admin123}
       - NEBULA_ADMIN_PASSWORD=${NEBULA_ADMIN_PASSWORD:-admin123}
-
-      # Usuário exibido no QR Code do autenticador (opcional)
       - NEBULA_ADMIN_USER=${NEBULA_ADMIN_USER:-admin}
 
-      # ── MFA/TOTP ─────────────────────────────────────────────────────────
-      # Secret base32 para o Google Authenticator / Authy / etc.
+      # ── Autenticação em Dois Fatores (MFA / 2FA TOTP) ─────────────────────
+      - NEBULA_MFA_SETUP=${NEBULA_MFA_SETUP:-true}
       - NEBULA_MFA_SECRET=${NEBULA_MFA_SECRET:-}
 
-      # Defina como 'true' no primeiro acesso para exibir o QR Code de setup
-      - NEBULA_MFA_SETUP=${NEBULA_MFA_SETUP:-true}
+      # ── Sessão & Assinatura de Tokens (JWT) ──────────────────────────────
+      - NEBULA_JWT_SECRET=${NEBULA_JWT_SECRET:-nebula_super_secure_jwt_secret_change_in_production_key_32chars}
 
-      # ── JWT ───────────────────────────────────────────────────────────────
-      # Chave secreta para assinar os tokens JWT de sessão (mínimo 32 chars)
-      - NEBULA_JWT_SECRET=${NEBULA_JWT_SECRET:-troque_por_uma_string_longa_e_aleatoria_segura}
+      # ── Isolamento do Sistema de Arquivos & Workspaces ────────────────────
+      - NEBULA_ROOTS=${NEBULA_ROOTS:-/:/workspace:/data}
+      - NEBULA_READONLY=${NEBULA_READONLY:-false}
 
-      # ── Workspace ─────────────────────────────────────────────────────────
-      # Pastas permitidas no servidor (separadas por : no Linux)
-      - NEBULA_ROOTS=/:/workspace:/data
-
-      # Modo somente-leitura (desabilita terminal e escrita de arquivos)
-      - NEBULA_READONLY=false
-
-      # ── Gemini AI (opcional) ──────────────────────────────────────────────
+      # ── Integrações Opcionais ─────────────────────────────────────────────
       # - GEMINI_API_KEY=${GEMINI_API_KEY:-}
 
     volumes:
-      # Bind mounts locais (compatíveis com Windows Docker Desktop e Linux VPS)
+      # Persistência de dados, notas, senhas alteradas e auth-config.json
       - ./data:/data
+      # Volume do seu código-fonte / workspace de trabalho principal
       - ./workspace:/workspace
-      # Para suporte ao Docker Monitor (janela de containers):
-      # - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Acesso ao Docker Daemon para a janela Docker Monitor (funciona em Linux e Docker Desktop)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
@@ -58,3 +70,37 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ============================================================================
+  # SUB-CONTAINERS / RUNNERS OPCIONAIS (Isolamento de Scripts & Automações)
+  # Ative apenas se desejar isolar execuções: docker compose --profile runners up -d
+  # ============================================================================
+  runner-python:
+    image: python:3.11-slim
+    container_name: nebula-runner-python
+    restart: unless-stopped
+    profiles:
+      - runners
+    volumes:
+      - ./workspace:/workspace
+    working_dir: /workspace
+    command: tail -f /dev/null
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  runner-node:
+    image: node:22-alpine
+    container_name: nebula-runner-node
+    restart: unless-stopped
+    profiles:
+      - runners
+    volumes:
+      - ./workspace:/workspace
+    working_dir: /workspace
+    command: tail -f /dev/null
+    deploy:
+      resources:
+        limits:
+          memory: 512M

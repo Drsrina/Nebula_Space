@@ -1,7 +1,18 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { generateSecret, generateURI, verifySync } from 'otplib';
 import QRCode from 'qrcode';
-import { checkPassword, signToken, verifyToken } from '../lib/auth';
+import {
+  checkPassword,
+  signToken,
+  verifyToken,
+  getEffectiveAdminPassword,
+  isMfaActive,
+  getEffectiveMfaSecret,
+  saveAuthConfig,
+  getAuthConfig,
+  hashPassword,
+  requireAuth
+} from '../lib/auth';
 
 export const authRouter = Router();
 
@@ -43,6 +54,20 @@ function authRateLimiter(req: Request, res: Response, next: NextFunction): void 
 }
 
 /**
+ * GET /api/auth/status
+ * Retorna o status de autenticação (se há senha e se MFA está ativo)
+ */
+authRouter.get('/status', (_req: Request, res: Response) => {
+  const adminPassword = getEffectiveAdminPassword();
+  const mfaEnabled = isMfaActive();
+  res.json({
+    hasPassword: Boolean(adminPassword),
+    mfaEnabled,
+    user: process.env.NEBULA_ADMIN_USER || 'admin',
+  });
+});
+
+/**
  * POST /api/auth/login
  * Body: { password: string, totp?: string }
  * Retorna: { token: string } ou 401
@@ -50,7 +75,7 @@ function authRateLimiter(req: Request, res: Response, next: NextFunction): void 
 authRouter.post('/login', authRateLimiter, async (req: Request, res: Response) => {
   const { password, totp } = req.body as { password?: string; totp?: string };
 
-  const adminPassword = process.env.NEBULA_ADMIN_PASSWORD;
+  const adminPassword = getEffectiveAdminPassword();
 
   // Se não há senha configurada, modo dev — aceita qualquer coisa
   if (!adminPassword) {
@@ -70,24 +95,26 @@ authRouter.post('/login', authRateLimiter, async (req: Request, res: Response) =
     return;
   }
 
-  // Verifica MFA se configurado
-  const mfaSecret = process.env.NEBULA_MFA_SECRET;
-  if (mfaSecret) {
-    if (!totp) {
-      // Senha correta mas MFA pendente
-      res.status(206).json({ mfaRequired: true });
-      return;
-    }
+  // Verifica MFA se configurado e ativo
+  if (isMfaActive()) {
+    const mfaSecret = getEffectiveMfaSecret();
+    if (mfaSecret) {
+      if (!totp) {
+        // Senha correta mas MFA pendente
+        res.status(206).json({ mfaRequired: true });
+        return;
+      }
 
-    try {
-      const result = verifySync({ token: totp, secret: mfaSecret });
-      if (!result.valid) {
+      try {
+        const result = verifySync({ token: totp, secret: mfaSecret });
+        if (!result.valid) {
+          res.status(401).json({ error: 'Código TOTP inválido ou expirado.' });
+          return;
+        }
+      } catch {
         res.status(401).json({ error: 'Código TOTP inválido ou expirado.' });
         return;
       }
-    } catch {
-      res.status(401).json({ error: 'Código TOTP inválido ou expirado.' });
-      return;
     }
   }
 
@@ -96,9 +123,111 @@ authRouter.post('/login', authRateLimiter, async (req: Request, res: Response) =
 });
 
 /**
- * GET /api/auth/mfa-setup
- * Gera e retorna o QR Code para configurar o app autenticador.
- * Requer NEBULA_MFA_SETUP=true e autenticação do administrador.
+ * POST /api/auth/change-password
+ * Permite alterar a senha do administrador a partir das Configurações Globais
+ */
+authRouter.post('/change-password', requireAuth, async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+  const adminPassword = getEffectiveAdminPassword();
+
+  if (!newPassword || newPassword.length < 6) {
+    res.status(400).json({ error: 'A nova senha deve ter no mínimo 6 caracteres.' });
+    return;
+  }
+
+  if (adminPassword) {
+    if (!currentPassword) {
+      res.status(400).json({ error: 'Senha atual é obrigatória.' });
+      return;
+    }
+    const match = await checkPassword(currentPassword, adminPassword);
+    if (!match) {
+      res.status(401).json({ error: 'Senha atual incorreta.' });
+      return;
+    }
+  }
+
+  const hash = await hashPassword(newPassword);
+  const cfg = getAuthConfig();
+  saveAuthConfig({ ...cfg, passwordHash: hash, updatedAt: Date.now() });
+
+  res.json({ ok: true, message: 'Senha do administrador alterada com sucesso.' });
+});
+
+/**
+ * POST /api/auth/mfa/generate
+ * Gera um novo secret temporário e respectivo QR Code para setup em Configurações Globais
+ */
+authRouter.post('/mfa/generate', requireAuth, async (_req: Request, res: Response) => {
+  try {
+    const secret = generateSecret();
+    const adminUser = process.env.NEBULA_ADMIN_USER || 'admin';
+    const otpAuthUrl = generateURI({
+      issuer: SERVICE_NAME,
+      label: adminUser,
+      secret,
+    });
+    const qrCode = await QRCode.toDataURL(otpAuthUrl);
+    res.json({ secret, otpAuthUrl, qrCode });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Falha ao gerar QR Code: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/auth/mfa/enable
+ * Confirma o código do app autenticador e ativa o MFA permanentemente
+ */
+authRouter.post('/mfa/enable', requireAuth, (req: Request, res: Response) => {
+  const { secret, totp } = req.body as { secret?: string; totp?: string };
+
+  if (!secret || !totp) {
+    res.status(400).json({ error: 'Secret e código TOTP são obrigatórios para ativação.' });
+    return;
+  }
+
+  try {
+    const result = verifySync({ token: totp, secret });
+    if (!result.valid) {
+      res.status(400).json({ error: 'Código de 6 dígitos inválido ou expirado.' });
+      return;
+    }
+
+    const cfg = getAuthConfig();
+    saveAuthConfig({ ...cfg, mfaEnabled: true, mfaSecret: secret, updatedAt: Date.now() });
+    res.json({ ok: true, message: 'Autenticação em dois fatores (MFA) ativada com sucesso.' });
+  } catch {
+    res.status(400).json({ error: 'Código de verificação TOTP inválido.' });
+  }
+});
+
+/**
+ * POST /api/auth/mfa/disable
+ * Desativa o MFA e remove os dispositivos vinculados
+ */
+authRouter.post('/mfa/disable', requireAuth, async (req: Request, res: Response) => {
+  const { currentPassword } = req.body as { currentPassword?: string };
+  const adminPassword = getEffectiveAdminPassword();
+
+  if (adminPassword) {
+    if (!currentPassword) {
+      res.status(400).json({ error: 'Informe a senha atual para desativar o MFA.' });
+      return;
+    }
+    const match = await checkPassword(currentPassword, adminPassword);
+    if (!match) {
+      res.status(401).json({ error: 'Senha incorreta.' });
+      return;
+    }
+  }
+
+  const cfg = getAuthConfig();
+  saveAuthConfig({ ...cfg, mfaEnabled: false, mfaSecret: null, updatedAt: Date.now() });
+  res.json({ ok: true, message: 'MFA desativado e dispositivos removidos.' });
+});
+
+/**
+ * GET /api/auth/mfa-setup (Compatibilidade retroativa com QR Code corrigido)
  */
 authRouter.get('/mfa-setup', async (req: Request, res: Response) => {
   if (process.env.NEBULA_MFA_SETUP !== 'true') {
@@ -106,7 +235,7 @@ authRouter.get('/mfa-setup', async (req: Request, res: Response) => {
     return;
   }
 
-  const adminPassword = process.env.NEBULA_ADMIN_PASSWORD;
+  const adminPassword = getEffectiveAdminPassword();
   if (adminPassword) {
     let authorized = false;
     const authHeader = req.headers.authorization;
@@ -133,18 +262,7 @@ authRouter.get('/mfa-setup', async (req: Request, res: Response) => {
     }
   }
 
-  let secret = process.env.NEBULA_MFA_SECRET;
-  if (!secret) {
-    // Gera um novo secret se não existir
-    secret = generateSecret();
-    res.json({
-      secret,
-      message: 'Copie este secret para NEBULA_MFA_SECRET no .env e reinicie o servidor.',
-      qrCode: null,
-    });
-    return;
-  }
-
+  const secret = getEffectiveMfaSecret() || generateSecret();
   const adminUser = process.env.NEBULA_ADMIN_USER || 'admin';
   const otpAuthUrl = generateURI({
     issuer: SERVICE_NAME,
@@ -166,12 +284,10 @@ authRouter.get('/mfa-setup', async (req: Request, res: Response) => {
 
 /**
  * POST /api/auth/verify-totp
- * Body: { totp: string }
- * Verifica código TOTP independentemente (para validação no frontend sem senha)
  */
 authRouter.post('/verify-totp', authRateLimiter, (req: Request, res: Response) => {
   const { totp } = req.body as { totp?: string };
-  const mfaSecret = process.env.NEBULA_MFA_SECRET;
+  const mfaSecret = getEffectiveMfaSecret();
 
   if (!mfaSecret) {
     res.json({ valid: true, message: 'MFA não configurado.' });
@@ -194,4 +310,5 @@ authRouter.post('/verify-totp', authRateLimiter, (req: Request, res: Response) =
     res.status(401).json({ valid: false, error: 'Código TOTP inválido.' });
   }
 });
+
 

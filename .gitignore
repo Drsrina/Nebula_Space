@@ -8,7 +8,6 @@ coverage/
 !.env.example
 data/
 
-# Pasta do VS Code (não rastrear no repositório)
 vscode-main/
-n8n-master/
-Arcadia-main/
+0man/
+0at/

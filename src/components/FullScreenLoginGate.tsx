@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Lock,
   KeyRound,
-  QrCode,
   Eye,
   EyeOff,
   Loader2,
@@ -11,13 +10,13 @@ import {
   ShieldCheck,
   CheckCircle2,
 } from 'lucide-react';
-import { setAuthToken, authFetch } from '../lib/api';
+import { setAuthToken } from '../lib/api';
 
 interface FullScreenLoginGateProps {
   onLoginSuccess: (token: string) => void;
 }
 
-type Step = 'password' | 'totp' | 'qr-setup';
+type Step = 'password' | 'totp';
 
 export const FullScreenLoginGate: React.FC<FullScreenLoginGateProps> = ({ onLoginSuccess }) => {
   const [step, setStep] = useState<Step>('password');
@@ -26,7 +25,6 @@ export const FullScreenLoginGate: React.FC<FullScreenLoginGateProps> = ({ onLogi
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [qrData, setQrData] = useState<{ qrCode: string; secret: string; otpAuthUrl: string } | null>(null);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,30 +77,6 @@ export const FullScreenLoginGate: React.FC<FullScreenLoginGateProps> = ({ onLogi
       }
     } catch {
       setError('Não foi possível conectar ao servidor.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadQrSetup = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const headers: Record<string, string> = {};
-      if (password) {
-        headers['x-admin-password'] = password;
-      }
-      const res = await authFetch('/api/auth/mfa-setup', { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setQrData(data);
-        setStep('qr-setup');
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setError(errData.error || 'Setup de MFA não disponível. Configure NEBULA_MFA_SETUP=true.');
-      }
-    } catch {
-      setError('Erro ao carregar QR Code.');
     } finally {
       setIsLoading(false);
     }
@@ -200,15 +174,6 @@ export const FullScreenLoginGate: React.FC<FullScreenLoginGateProps> = ({ onLogi
               )}
               <span>Entrar no Workspace</span>
             </button>
-
-            <button
-              type="button"
-              onClick={loadQrSetup}
-              className="text-center text-[11px] font-mono text-[#506c94] hover:text-[#3ba9ff] transition-colors py-1 cursor-pointer"
-            >
-              <QrCode className="w-3.5 h-3.5 inline mr-1" />
-              Configurar MFA / 2FA (TOTP)
-            </button>
           </form>
         )}
 
@@ -261,33 +226,6 @@ export const FullScreenLoginGate: React.FC<FullScreenLoginGateProps> = ({ onLogi
               ← Voltar para senha
             </button>
           </form>
-        )}
-
-        {/* Step: QR Setup */}
-        {step === 'qr-setup' && qrData && (
-          <div className="flex flex-col gap-4 text-center">
-            <div className="text-xs font-mono text-[#7a92b8]">
-              <QrCode className="w-6 h-6 mx-auto mb-2 text-[#5eead4]" />
-              Escaneie este QR Code com seu app autenticador (Google Authenticator, Authy):
-            </div>
-
-            <div className="flex justify-center p-2 bg-white rounded-2xl mx-auto">
-              <img src={qrData.qrCode} alt="QR Code MFA" className="w-44 h-44 rounded-lg" />
-            </div>
-
-            <div className="bg-[#070e1c] rounded-xl p-3 border border-[#5eead4]/20 text-left font-mono">
-              <div className="text-[10px] text-[#7a92b8] mb-0.5">Chave Manual (Secret):</div>
-              <div className="text-xs text-[#5eead4] break-all select-all font-bold">{qrData.secret}</div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => { setStep('password'); setError(''); }}
-              className="w-full py-2.5 rounded-xl bg-[#3ba9ff]/20 border border-[#3ba9ff]/40 text-[#5eead4] text-xs font-mono font-bold hover:bg-[#3ba9ff]/30 transition-all cursor-pointer"
-            >
-              Pronto — Voltar e Entrar
-            </button>
-          </div>
         )}
       </div>
     </div>

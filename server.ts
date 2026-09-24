@@ -7,6 +7,7 @@ import { workflowRouter } from './server/routes/workflowRoutes';
 import { cronRouter, initCronScheduler } from './server/routes/cronRoutes';
 import { proxyRouter } from './server/routes/proxyRoutes';
 import { pluginRouter } from './server/routes/pluginRoutes';
+import { dockerRouter } from './server/routes/dockerRoutes';
 import { requireAuth } from './server/lib/auth';
 import { getAllowedRoots } from './server/lib/security';
 
@@ -81,6 +82,7 @@ async function startServer() {
   app.use('/api/cron', requireAuth, cronRouter);
   app.use('/api/proxy', requireAuth, proxyRouter);
   app.use('/api/plugins', requireAuth, pluginRouter);
+  app.use('/api/docker', requireAuth, dockerRouter);
 
 
   // =========================================================================

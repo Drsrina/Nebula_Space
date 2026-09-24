@@ -68,6 +68,8 @@ const SnippetsWindow = React.lazy(() => import('./windows/SnippetsWindow').then(
 const LivePreviewSplitWindow = React.lazy(() => import('./windows/LivePreviewSplitWindow').then(m => ({ default: m.LivePreviewSplitWindow })));
 const CodeSandboxWindow = React.lazy(() => import('./windows/CodeSandboxWindow').then(m => ({ default: m.CodeSandboxWindow })));
 const PluginManagerWindow = React.lazy(() => import('./windows/PluginManagerWindow').then(m => ({ default: m.PluginManagerWindow })));
+const GraphWindow = React.lazy(() => import('./windows/GraphWindow').then(m => ({ default: m.GraphWindow })));
+const DockerMonitorWindow = React.lazy(() => import('./windows/DockerMonitorWindow').then(m => ({ default: m.DockerMonitorWindow })));
 
 interface WindowProps {
   window: WindowData;
@@ -409,7 +411,7 @@ export const Window: React.FC<WindowProps> = ({ window: win }) => {
   };
 
   // Multi-instance types that support duplication
-  const MULTI_INSTANCE_TYPES = new Set(['editor', 'terminal', 'file-browser', 'file-tree', 'note', 'workflow', 'kanban', 'web-embed', 'api-client', 'live-preview', 'code-sandbox']);
+  const MULTI_INSTANCE_TYPES = new Set(['editor', 'terminal', 'file-browser', 'file-tree', 'note', 'workflow', 'kanban', 'web-embed', 'api-client', 'live-preview', 'code-sandbox', 'graph', 'docker-monitor']);
   const canDuplicate = MULTI_INSTANCE_TYPES.has(win.type);
 
   // Handle Pop-out — toggle detached external browser window
@@ -470,11 +472,15 @@ export const Window: React.FC<WindowProps> = ({ window: win }) => {
         return <SnippetsWindow />;
       case 'live-preview':
         return <LivePreviewSplitWindow />;
-      // ── v2.7 New Windows ─────────────────────────────────────────────────
+      // ── v2.7 / v2.8 New Windows ──────────────────────────────────────────
       case 'code-sandbox':
         return <CodeSandboxWindow />;
       case 'plugin-manager':
         return <PluginManagerWindow />;
+      case 'graph':
+        return <GraphWindow />;
+      case 'docker-monitor':
+        return <DockerMonitorWindow />;
       default:
         return <div className="p-4 text-xs text-[#7a92b8]">Janela vazia.</div>;
     }

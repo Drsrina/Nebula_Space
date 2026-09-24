@@ -29,70 +29,63 @@ Um dos maiores diferenciais do Nebula é o tratamento inteligente de interação
 O workspace do Nebula oferece janelas nativas integradas para todo o ciclo de desenvolvimento:
 
 ### 1. 📝 Editor de Código Multi-Abas (`EditorWindow`) — *Degrau 0*
-- Monaco Editor completo com tema neon customizado (`nebula-dark`).
-- Suporte a múltiplas abas com indicador visual de alterações pendentes (*dirty state*).
-- Numeração de linhas, busca e substituição, minimapa, quebra de linha e destaque de sintaxe multiliguagem.
-- Atalhos universais de gravação (`Ctrl+S` / `Cmd+S`).
-- Conexão direta com arquivos do disco local via **File System Access API** ou via backend remoto Express.
+- Monaco Editor completo com tema neon customizado (`nebula-dark`) e suporte a múltiplos temas (`tokyo-night`, `one-dark-pro`, `dracula-neon`).
+- **Menu Completo de Ações Avançadas**:
+  - **Arquivo**: Novo Arquivo (`Ctrl+N`), Abrir Arquivo Local (`Ctrl+O`), Salvar (`Ctrl+S`), **Salvar Como (`Save As...`)**, **Reverter Alterações (`Revert`)**, **Alternar Quebra de Linha (LF / CRLF)** e Exportar.
+  - **Editar**: Desfazer (`Ctrl+Z`), Refazer (`Ctrl+Y`), Buscar (`Ctrl+F`), Substituir (`Ctrl+H`).
+  - **Exibir**: Quebra de linha automática (*Word Wrap*), Minimapa, Drawer de Símbolos, Alternância de Tema.
+  - **Ferramentas**: Abrir Novo Editor Independente, Desencaixar Janela, Comparar com Git (Diff).
+- Instâncias de editor 100% independentes sem vazamento de estado de buffer ou cursor.
+- **Git Gutter em Tempo Real**: Linhas adicionadas (verde), editadas (âmbar) e removidas (vermelho) calculadas contra `HEAD`.
+- **Breadcrumbs Hierárquicos**: Caminho interativo da pasta e arquivo em foco.
+- **Outline Drawer de Símbolos**: Extração automática de interfaces, funções, classes e constantes com salto direto para o código.
 
-### 2. 💻 Terminal Integrado (`TerminalWindow`) — *Degrau 2*
-- Terminal local autônomo conectado via endpoint `POST /api/terminal/exec`.
-- Histórico de comandos com navegação rápida pelas setas ($\uparrow$ / $\downarrow$).
-- Atalhos de controle `Ctrl+C` (interromper), `Ctrl+L` ou comando `clear` (limpar tela).
-- Respeita o modo de segurança `NEBULA_READONLY` quando configurado.
+### 2. ⚡ Command Palette & Quick Open (`LauncherWindow`) — *Atalho Universal `Ctrl+P` / `Ctrl+K`*
+- Acessível instantaneamente em qualquer lugar através de `Ctrl+P` ou `Ctrl+K`.
+- **Modo Quick Open (`Ctrl+P`)**: Busca rápida e inteligente (fuzzy) por qualquer arquivo do projeto com abertura direta no editor.
+- **Comandos de Sistema & Ações Rápidas**: Alternar modos de operação (Local vs VPS), abrir janelas especializadas, alternar presets espaciais e resetar a câmera 3D.
+- Navegação completa por teclado com atalhos de seleção rápida.
 
-### 3. 🤖 Nebula AI Chat (`AiChatWindow`) — *Degrau 1*
-- Assistente de código integrado com a API do **Google Gemini 2.0 Flash** (`POST /api/ai/chat`).
-- **Contextualização inteligente**: Injeta automaticamente o arquivo atualmente em foco no Monaco Editor sempre que você menciona termos como "código", "função" ou "arquivo".
-- Formatação de respostas em Markdown com blocos de código syntax-highlighted.
+### 3. 📌 Notas Espaciais & Exportação Multi-Formato (`NoteWindow`) — *Degrau 2*
+- Editor de anotações ricas em Markdown com renderização instantânea, blocos de código e listas de afazeres interativas (*checkboxes*).
+- **Exportação Multi-Formato com 1 Clique**:
+  - **HTML**: Documento HTML formatado com folha de estilos limpa pronta para visualização externa.
+  - **PDF**: Layout formatado com estilo de impressão limpo, pronto para arquivamento ou envio.
+  - **Markdown (.md)**: Download direto do arquivo Markdown puro.
+- Categorização visual por cores neon (ciano, roxo, azul, âmbar, verde e vermelho).
+- Estatísticas de texto em tempo real (contagem de palavras e caracteres).
 
-### 4. 🐙 Painel Git Local & Forgejo / Gitea (`GitPanelWindow`) — *Degrau 1*
-- **Git Local**:
-  - Detecção e listagem de arquivos modificados, novos (*untracked*) e deletados.
-  - Ações rápidas de **Stage (+)**, **Unstage (-)** e descarte de alterações.
-  - Criação de commits com mensagem personalizada, autor e carimbo de data.
-  - Troca de branches (*checkout*) e visualização de status à frente/atrás da origem.
-  - Histórico de commits com identificador SHA reduzido e mensagem.
-  - Acesso com 1 clique ao **Visualizador de Diff** para qualquer arquivo alterado.
-- **Conexão Forgejo / Gitea / Codeberg / GitHub**:
-  - Configuração de URL da instância e token de API pessoal.
-  - Listagem de repositórios remotos, Issues abertas/fechadas e Pull Requests em tempo real.
+### 4. 🎛️ Presets de Layout Espacial 3D (Workspaces Salvos)
+- Alterne instantaneamente entre configurações pré-definidas de janelas nos 3 degraus cognitivos com 1 clique:
+  - **Preset "Coding"**: Editor Monaco em foco no Degrau 0, Diff no Degrau 1, Painel Git no Degrau 2.
+  - **Preset "Review / Notes"**: Duas notas lado a lado no Degrau 0, Árvore de Arquivos no Degrau 1.
+  - **Preset "Full Stack"**: Editor de Código no Degrau 0, Terminal Interativo no Degrau 1, Monitor Docker no Degrau 2.
+- Animação de transição suave de câmera entre planos com interpolação precisa (lerp).
 
-### 5. ⚖️ Visualizador de Diferenças (`DiffWindow`)
-- Visualização lado a lado (*Side-by-Side*) ou unificada (*Unified Diff*).
-- Contadores de linhas adicionadas (`+`) e removidas (`-`) com destaque sintático neon azul/vermelho.
+### 5. 💻 Terminal Web Interativo Real (xterm.js + WebSocket / PTY) — *Degrau 2*
+- Terminal interativo real conectado a uma sessão PTY (`/bin/bash` ou `sh` dentro do container).
+- Suporte a comandos interativos completos (`top`, `htop`, `vim`, `nano`, `git`, `npm`).
+- Histórico persistente de comandos, atalhos de controle `Ctrl+C`, `Ctrl+L` e redimensionamento dinâmico de colunas e linhas.
 
-### 6. 🗂️ Árvore de Diretórios e Navegador (`FileTreeWindow` & `FileBrowserWindow`) — *Degrau 1*
-- Expansão e recolhimento hierárquico de diretórios.
-- Busca e filtragem instantânea de arquivos por nome ou extensão.
-- Abertura direta de pastas do sistema operacional com permissão segura do usuário.
-- *Workspace Fallback*: Modo de demonstração com arquivos reais caso executado em navegadores sem suporte à API nativa de arquivos.
+### 6. 🔄 Mini-Workflows de Automação & Crontab Integrado
+- Construtor visual de fluxos de automação baseado em nós encadeados.
+- **Nó Trigger**: Execução manual ou acionamento programado via agendador **Crontab**.
+- **Nó HTTP Request / Webhook**: Chamadas REST completas (GET, POST, PUT, DELETE) com headers e passagem de JSON para os nós seguintes.
+- **Nó Code-Box (Python / JavaScript)**: Processamento de dados e regras de negócio com payload encadeado.
+- Streaming em tempo real de logs de execução via Server-Sent Events (SSE).
 
-### 7. 📌 Notas Espaciais & Rascunhos (`NoteWindow`) — *Degrau 2*
-- Editor de notas ricas com formatação Markdown instantânea (títulos, negrito, itálico, listas de afazeres com checkboxes, blocos de código).
-- Categorização por etiquetas de cores (roxo, azul, ciano, âmbar, vermelho).
-- Cópia com 1 clique para a área de transferência e exportação para arquivos `.md`.
+### 7. 📦 Task Runner & Scripts com Autodescoberta
+- Painel dedicado de execução de rotinas e scripts com auto-detecção de processos em execução.
+- Varredura de scripts disponíveis no `package.json` e rotinas automatizadas.
+- Inclui script de demonstração integrado `timestamp-logger.js` gerado automaticamente para onboarding de novos desenvolvedores.
 
-### 8. 👁️ Previewer de Arquivos (`FilePreviewWindow`)
-- Renderização avançada de Markdown com tabelas e formatação estilizada.
-- Visualizador de imagens (PNG, JPG, SVG, WebP), JSON formatado e código fonte com contagem de linhas e tamanho em bytes.
-
-### 9. ⚡ Command Palette & Quick Open (`LauncherWindow`)
-- Acessível a qualquer momento via `Ctrl + K` ou `Ctrl + P`.
-- Modo **Quick Open** (`Ctrl + P`): Busca fuzzy instantânea de arquivos por nome em todo o workspace com abertura direta no Editor.
-- Comandos rápidos de alternância de modo, layout e criação de notas.
-
-### 10. 🔍 Busca Global no Workspace (`GlobalSearchWindow`) — *Degrau 1*
-- Acessível via atalho global `Ctrl + Shift + F` ou botão na barra superior.
-- Busca textual recursiva com suporte a expressões regulares (via endpoint `GET /api/fs/grep`).
-- Agrupamento inteligente de resultados por arquivo, contadores de ocorrências, números de linhas e snippets de código com destaque.
-- Navegação com 1 clique diretamente para o arquivo e linha no Monaco Editor.
-
-### 11. 📦 Task Runner & Scripts (`TaskRunnerWindow`) — *Degrau 2*
-- Acessível via botão **Tasks** na barra superior ou Launcher.
-- Auto-detecção de scripts definidos no `package.json` (`npm run dev`, `npm run build`, `npm run lint`, etc.).
-- Execução de tarefas em background com streaming de logs em tempo real em um console embutido.
-- Controles de execução com botão Play/Stop e limpeza de histórico.
+### 8. 🛡️ Segurança Corporativa, MFA/2FA & Configurações Globais
+- **Barreira de Login em Tela Cheia (`FullScreenLoginGate`)**: Proteção total do canvas 3D contra acessos externos não autenticados.
+- **Gerenciamento Centralizado no Painel de Configurações**:
+  - **Alteração de Senha de Administrador**: Atualização de credenciais com persistência automática no `/data/auth-config.json` sem necessidade de reiniciar containers.
+  - **Autenticação em Dois Fatores (TOTP / 2FA)**: Geração de QR Code nítido para pareamento com Google Authenticator, Authy, Microsoft Authenticator e 1Password, com confirmação de 6 dígitos.
+  - **Revogação de Dispositivos & Desativação Segura**: Desativação de MFA mediante confirmação da senha administrativa.
+- **Isolamento de Diretórios (`NEBULA_ROOTS`)**: Proteção estrita contra *path traversal* em todas as operações de I/O.
 
 ### 12. 🎨 Experiência Monaco Avançada: Temas, Git Gutter & Símbolos
 - **Git Gutter em Tempo Real**: Indicadores luminosos no gutter do Monaco (verde para adições, âmbar para edições, vermelho para remoções) comparando em tempo real com o Git HEAD.
@@ -194,16 +187,14 @@ O Nebula foi projetado para deploy descomplicado em servidores próprios, VPS ou
 
 ### Opção 1: Docker & Docker Compose (Recomendado)
 
-Utilize o arquivo `docker-compose.yml.example`:
+O repositório já disponibiliza na raiz um template pronto para uso (`docker-compose.yml` e `docker-compose.yml.example`):
 
 ```bash
-cp docker-compose.yml.example docker-compose.yml
+docker compose up -d --build
 ```
 
-Ajuste as variáveis no `docker-compose.yml`:
+Configuração de exemplo do `docker-compose.yml`:
 ```yaml
-version: "3.8"
-
 services:
   nebula:
     build:
@@ -216,53 +207,18 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - NEBULA_TOKEN=defina_um_token_seguro_aqui
-      - NEBULA_ROOTS=/data:/workspace
+      - NEBULA_PASSWORD=sua_senha_segura
+      - NEBULA_ADMIN_PASSWORD=sua_senha_segura
+      - NEBULA_ADMIN_USER=admin
+      - NEBULA_MFA_SETUP=true
+      - NEBULA_JWT_SECRET=troque_por_uma_string_longa_e_aleatoria_com_32_chars
+      - NEBULA_ROOTS=/:/workspace:/data
       - NEBULA_READONLY=false
     volumes:
-      - /meu-diretorio-no-host/data:/data
-      - /meu-diretorio-no-host/workspace:/workspace
-```
-
-Inicie o container:
-```bash
-docker compose up -d
-```
-
-### Opção 2: Build Manual para Produção
-
-Compile a aplicação frontend e o backend empacotado:
-```bash
-npm run build
-npm start
-```
-O comando compila o frontend estático para `dist/` e empacota o servidor Express em `dist/server.cjs`.
-
-### Opção 3: Deploy em Servidores Web Estáticos (Caddy / Nginx)
-
-Caso deseje servir apenas a interface SPA client-side sem o backend Node:
-
-#### Caddy (`Caddyfile`):
-```caddy
-nebula.seudominio.com {
-    root * /caminho/para/nebula/dist
-    file_server
-    try_files {path} /index.html
-}
-```
-
-#### Nginx:
-```nginx
-server {
-    listen 80;
-    server_name nebula.seudominio.com;
-    root /var/www/nebula/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-}
+      # Persistência de dados, notas, senhas alteradas e auth-config.json
+      - ./data:/data
+      # Volume com os projetos e código fonte
+      - ./workspace:/workspace
 ```
 
 ---
@@ -273,10 +229,14 @@ server {
 |---|---|---|
 | `PORT` | `3000` | Porta HTTP em que o servidor Express escutará. |
 | `NODE_ENV` | `development` | Ambiente de execução (`development` ou `production`). |
-| `NEBULA_TOKEN` | *Vazio* | Token Bearer obrigatório para autenticar operações no filesystem. Se vazio em dev, o acesso é livre. |
-| `NEBULA_ROOTS` | `/data` | Lista de diretórios autorizados separados por vírgula ou dois-pontos. Protege contra *path traversal*. |
-| `NEBULA_READONLY` | `false` | Se `true`, bloqueia todas as requisições de escrita, criação e exclusão. |
-| `GEMINI_API_KEY` | *Opcional* | Chave de API Google Gemini gerenciada no servidor. |
+| `NEBULA_PASSWORD` / `NEBULA_ADMIN_PASSWORD` | `admin123` | Senha inicial de acesso administrativo. Suporta texto puro ou hash bcrypt. |
+| `NEBULA_ADMIN_USER` | `admin` | Nome de usuário exibido no emissor de QR Code TOTP. |
+| `NEBULA_MFA_SETUP` | `true` | Habilita a geração e configuração de 2FA/MFA nas Configurações Globais. |
+| `NEBULA_MFA_SECRET` | *Vazio* | Secret base32 pré-definido para TOTP (opcional; pode ser ativado pela interface). |
+| `NEBULA_JWT_SECRET` | *Chave padrão* | Chave secreta usada para assinar os tokens JWT de sessão (mínimo 32 caracteres). |
+| `NEBULA_ROOTS` | `/:/workspace:/data` | Lista de diretórios autorizados separados por dois-pontos. Protege contra *path traversal*. |
+| `NEBULA_READONLY` | `false` | Se `true`, bloqueia todas as requisições de escrita, criação de arquivos e execução de shell. |
+| `GEMINI_API_KEY` | *Opcional* | Chave de API Google Gemini gerenciada no servidor para o assistente de código. |
 
 ---
 
