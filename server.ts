@@ -101,6 +101,8 @@ async function startServer() {
 
     const { exec } = await import('child_process');
     const { getAllowedRoots, validateAndResolvePath } = await import('./server/lib/security');
+    const fs = await import('fs');
+    const path = await import('path');
     const allowedRoots = getAllowedRoots().map((r) => r.path);
 
     // Validação estrita do diretório de trabalho contra as raízes permitidas
@@ -114,14 +116,59 @@ async function startServer() {
       workDir = resolved.resolvedPath;
     }
 
+    const trimmedCmd = command.trim();
+
+    // Tratamento nativo e persistente do comando `cd`
+    if (trimmedCmd === 'cd' || trimmedCmd === 'cd ~') {
+      const homeRoot = allowedRoots[0] || process.cwd();
+      res.json({ stdout: '', stderr: '', cwd: homeRoot });
+      return;
+    }
+
+    if (trimmedCmd.startsWith('cd ')) {
+      const targetRaw = trimmedCmd.slice(3).trim().replace(/^['"]|['"]$/g, '');
+      const targetResolved = path.resolve(workDir, targetRaw);
+      const validation = validateAndResolvePath(targetResolved);
+
+      if (validation.error || !validation.resolvedPath) {
+        res.json({
+          stdout: '',
+          stderr: `cd: ${targetRaw}: Diretório fora das raízes permitidas.\n`,
+          cwd: workDir,
+        });
+        return;
+      }
+
+      if (!fs.existsSync(validation.resolvedPath) || !fs.statSync(validation.resolvedPath).isDirectory()) {
+        res.json({
+          stdout: '',
+          stderr: `cd: ${targetRaw}: Diretório não encontrado ou não é uma pasta.\n`,
+          cwd: workDir,
+        });
+        return;
+      }
+
+      res.json({ stdout: '', stderr: '', cwd: validation.resolvedPath });
+      return;
+    }
+
     // Execução assíncrona não bloqueante com timeout e buffer controlado
+    const shellBin = process.platform === 'win32' ? undefined : (fs.existsSync('/bin/bash') ? '/bin/bash' : '/bin/sh');
     exec(
       command,
       {
         cwd: workDir,
-        timeout: 15000,
-        maxBuffer: 1024 * 1024, // 1MB
+        shell: shellBin,
+        timeout: 20000,
+        maxBuffer: 2 * 1024 * 1024, // 2MB
         encoding: 'utf8',
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          FORCE_COLOR: '1',
+          PWD: workDir,
+        },
       },
       (err, stdout, stderr) => {
         res.json({

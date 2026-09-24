@@ -31,6 +31,7 @@ import { useWindowsStore } from '../store/useWindowsStore';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useFSStore } from '../store/useFSStore';
+import { useLayoutPresetsStore } from '../store/useLayoutPresetsStore';
 import { WindowType } from '../types';
 
 interface PaletteItem {
@@ -227,10 +228,42 @@ export const CommandPaletteOverlay: React.FC = () => {
       {
         id: 'act-git',
         category: 'actions',
-        label: 'Abrir Git Local & Forgejo',
-        sublabel: 'Controle de versão, commits e remotos',
+        label: 'Abrir Git & Versionamento',
+        sublabel: 'Multi-repositório, GitHub, GitLab, Forgejo e commits',
         icon: <GitBranch className="w-4 h-4 text-[#ec4899]" />,
         onSelect: () => openOrFocus('git-panel', 1),
+      },
+      {
+        id: 'preset-coding',
+        category: 'actions',
+        label: 'Layout Preset: Coding',
+        sublabel: 'Editor D0, Diff D1, Git & Versionamento D2',
+        icon: <Layers className="w-4 h-4 text-[#3ba9ff]" />,
+        onSelect: () => useLayoutPresetsStore.getState().applyPreset('preset-coding'),
+      },
+      {
+        id: 'preset-review',
+        category: 'actions',
+        label: 'Layout Preset: Review / Notes',
+        sublabel: 'Duas notas lado a lado D0, File Browser D1',
+        icon: <Layers className="w-4 h-4 text-[#5eead4]" />,
+        onSelect: () => useLayoutPresetsStore.getState().applyPreset('preset-review-notes'),
+      },
+      {
+        id: 'preset-fullstack',
+        category: 'actions',
+        label: 'Layout Preset: Full Stack & Ops',
+        sublabel: 'Editor + Terminal D0, Tasks + Docker D1, Git D2',
+        icon: <Layers className="w-4 h-4 text-[#f59e0b]" />,
+        onSelect: () => useLayoutPresetsStore.getState().applyPreset('preset-fullstack'),
+      },
+      {
+        id: 'preset-zen',
+        category: 'actions',
+        label: 'Layout Preset: Zen / Foco Total',
+        sublabel: 'Editor centralizado único no Degrau 0',
+        icon: <Layers className="w-4 h-4 text-[#ec4899]" />,
+        onSelect: () => useLayoutPresetsStore.getState().applyPreset('preset-zen'),
       },
       {
         id: 'act-ai',

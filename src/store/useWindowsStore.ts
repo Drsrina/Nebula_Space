@@ -75,7 +75,7 @@ const DEFAULT_WINDOWS: WindowData[] = [
   },
   {
     id: 'win-git-main',
-    title: 'Git Local & Forgejo',
+    title: 'Git & Versionamento',
     type: 'git-panel',
     depth: 1, // Degrau 1 (Contexto Z = -400px)
     x: 550,
@@ -179,7 +179,7 @@ export const useWindowsStore = create<WindowsStoreState>((set, get) => ({
     } else if (type === 'git-panel') {
       defaultWidth = 460;
       defaultHeight = 540;
-      defaultTitle = 'Git Local & Forgejo';
+      defaultTitle = 'Git & Versionamento';
     } else if (type === 'diff') {
       defaultWidth = 760;
       defaultHeight = 500;

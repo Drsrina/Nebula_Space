@@ -141,7 +141,7 @@ export const LauncherWindow: React.FC = () => {
     { label: 'Abrir AI Chat', icon: <Bot className="w-4 h-4 text-[#f59e0b]" />, onClick: () => openOrCreate('ai-chat') },
     { label: 'Abrir Editor', icon: <FileCode className="w-4 h-4 text-[#5eead4]" />, onClick: () => openOrCreate('editor') },
     { label: 'Abrir Terminal', icon: <Terminal className="w-4 h-4 text-[#a78bfa]" />, onClick: () => openOrCreate('terminal') },
-    { label: 'Abrir Git', icon: <GitBranch className="w-4 h-4 text-[#ec4899]" />, onClick: () => openOrCreate('git-panel') },
+    { label: 'Abrir Git & Versionamento', icon: <GitBranch className="w-4 h-4 text-[#ec4899]" />, onClick: () => openOrCreate('git-panel') },
     { label: 'Busca Global', icon: <Search className="w-4 h-4 text-[#38bdf8]" />, shortcut: '⌃⇧F', onClick: () => openOrCreate('global-search') },
     { label: 'Task Runner', icon: <Package className="w-4 h-4 text-[#a78bfa]" />, onClick: () => openOrCreate('task-runner') },
     { label: 'Code Sandbox (Python & JS)', icon: <Code2 className="w-4 h-4 text-[#38bdf8]" />, onClick: () => openOrCreate('code-sandbox') },

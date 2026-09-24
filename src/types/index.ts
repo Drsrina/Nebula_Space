@@ -73,6 +73,57 @@ export interface GitBranch {
   behind?: number;
 }
 
+export interface GitRepository {
+  id: string;
+  name: string;
+  path: string;
+  remoteUrl?: string;
+  provider?: 'github' | 'gitlab' | 'forgejo' | 'local';
+  currentBranch?: string;
+  ahead?: number;
+  behind?: number;
+  lastFetched?: number;
+}
+
+export type GitProviderType = 'github' | 'gitlab' | 'forgejo';
+
+export interface GitProviderAccount {
+  provider: GitProviderType;
+  instanceUrl: string;
+  username: string;
+  token: string;
+  connected?: boolean;
+}
+
+export interface GitRemoteSyncStatus {
+  isSyncing: boolean;
+  error: string | null;
+  lastSync: number | null;
+}
+
+export interface SpatialLayoutPreset {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  isBuiltIn?: boolean;
+  windows: Array<{
+    type: WindowType;
+    title?: string;
+    depth: DepthLevel;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    payload?: WindowPayload;
+  }>;
+  camera?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+}
+
 export interface ForgejoConfig {
   instanceUrl: string;
   username: string;

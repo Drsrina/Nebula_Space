@@ -38,6 +38,7 @@ import { useWindowsStore } from '../store/useWindowsStore';
 import { exportWorkspaceBackup, importWorkspaceBackup } from '../lib/workspaceBackup';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { usePaletteStore } from '../store/usePaletteStore';
+import { useLayoutPresetsStore } from '../store/useLayoutPresetsStore';
 import { DepthLevel } from '../types';
 import { HubDropdown } from './HubDropdown';
 import { clearAuthToken } from '../lib/api';
@@ -152,7 +153,7 @@ export const TopBar: React.FC = () => {
     },
     {
       id: 'git',
-      label: 'Git & Forgejo',
+      label: 'Git & Versionamento',
       icon: <GitBranch className="w-4 h-4 text-[#ec4899]" />,
       shortcut: '',
       onClick: () => open('git-panel'),
@@ -301,6 +302,30 @@ export const TopBar: React.FC = () => {
     },
   ];
 
+  const { presets, applyPreset, saveCurrentAsPreset } = useLayoutPresetsStore();
+
+  const handleSavePreset = () => {
+    const name = window.prompt('Nome para o novo Layout Preset:', 'Meu Setup');
+    if (!name || !name.trim()) return;
+    saveCurrentAsPreset(name);
+  };
+
+  const layoutItems = [
+    ...presets.map((p) => ({
+      id: p.id,
+      label: p.name,
+      icon: <Layers className="w-4 h-4 text-[#a78bfa]" />,
+      onClick: () => applyPreset(p.id),
+    })),
+    {
+      id: 'save-layout',
+      label: 'Salvar Layout Atual...',
+      icon: <Plus className="w-4 h-4 text-[#5eead4]" />,
+      separator: true,
+      onClick: handleSavePreset,
+    },
+  ];
+
   return (
     <header className="absolute top-4 left-4 right-4 z-50 pointer-events-none flex items-center justify-between gap-3">
       <input
@@ -321,7 +346,7 @@ export const TopBar: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold tracking-widest text-[#e6f0ff] uppercase">Nebula</span>
             <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#3ba9ff]/15 text-[#3ba9ff] border border-[#3ba9ff]/25">
-              v2.7.6
+              v2.7.7
             </span>
           </div>
         </div>
@@ -414,6 +439,15 @@ export const TopBar: React.FC = () => {
           items={acoesItems}
           color="#fbbf24"
           glowColor="rgba(251,191,36,0.15)"
+        />
+
+        {/* ── Dropdown: Layouts Presets ─────────────────────── */}
+        <HubDropdown
+          label="Layouts"
+          icon={<Layers className="w-4 h-4" />}
+          items={layoutItems}
+          color="#a78bfa"
+          glowColor="rgba(167,139,250,0.15)"
         />
 
         {/* ── Divider ─────────────────────────────────────── */}
