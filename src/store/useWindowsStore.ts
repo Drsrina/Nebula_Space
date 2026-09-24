@@ -101,6 +101,22 @@ const DEFAULT_WINDOWS: WindowData[] = [
       markdownContent: `# Ideias & Referências 📌\n\n- [x] Canvas 3D com 3 degraus de profundidade (0, -400, -700)\n- [x] Monaco Editor Notepad++ com multi-tabs\n- [x] Git Local com Stage / Unstage / Commit / Branches\n- [x] Diff viewer side-by-side e unified com neon styling\n- [x] Integração com instâncias Forgejo / Gitea / Codeberg\n\n*Esta nota vive no Degrau 2 (Arquivo/Referência).*`,
     },
   },
+  {
+    id: 'win-note-tutorial',
+    title: 'Nota: Tutorial Automação & Logs',
+    type: 'note',
+    depth: 2, // Degrau 2 (Arquivo / Referência Z = -700px)
+    x: -320,
+    y: -140,
+    width: 440,
+    height: 480,
+    zIndex: 4,
+    payload: {
+      noteId: 'note-tutorial-1',
+      title: 'Tutorial Automação & Logs',
+      markdownContent: `# ⚡ Automação & Timestamp Logger\n\nCriamos o script \`scripts/timestamp_logger.py\` de exemplo para novos usuários!\n\n### 1. Task Runner:\nAbra a janela **Tarefas & Scripts** e vá na aba **Autodescobertos** para rodar o script em 1 clique.\n\n### 2. Crontab:\nAbra a janela **Crontab** para agendar a execução periódica do script (ex: \`python scripts/timestamp_logger.py\`).\n\n### 3. Mini-Workflows:\nCrie fluxos visuais conectando gatilhos a nós de código e requisições HTTP!`,
+    },
+  },
 ];
 
 export const useWindowsStore = create<WindowsStoreState>((set, get) => ({

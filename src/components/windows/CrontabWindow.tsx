@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, Play, Pause, Trash2, RefreshCw, CheckCircle, XCircle, Clock,
-  ChevronDown, ChevronRight, Edit2, Save, X, AlertCircle,
+  Edit2, Save, X, AlertCircle, Download, Upload, HardDrive, Zap, Terminal,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
+import { authFetch } from '../../lib/api';
 
 interface CronJob {
   id: string;
@@ -25,6 +27,11 @@ interface CronLog {
   exitCode: number | null;
 }
 
+interface WorkflowBrief {
+  id: string;
+  name: string;
+}
+
 function cronValidate(expr: string): boolean {
   const parts = expr.trim().split(/\s+/);
   return parts.length === 5;
@@ -45,41 +52,63 @@ const CRON_EXAMPLES = [
   { expr: '* * * * *', desc: 'Todo minuto' },
   { expr: '*/5 * * * *', desc: 'A cada 5 min' },
   { expr: '0 * * * *', desc: 'A cada hora' },
+  { expr: '0 8 * * *', desc: 'Todo dia 08:00' },
   { expr: '0 9 * * 1-5', desc: 'Dias úteis 9h' },
   { expr: '0 0 * * *', desc: 'Meia-noite' },
 ];
 
 export const CrontabWindow: React.FC = () => {
   const [jobs, setJobs] = useState<CronJob[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowBrief[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [jobLogs, setJobLogs] = useState<Record<string, CronLog[]>>({});
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingJob, setEditingJob] = useState<CronJob | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
   const [formExpr, setFormExpr] = useState('*/5 * * * *');
   const [formCommand, setFormCommand] = useState('');
+  const [commandType, setCommandType] = useState<'workflow' | 'shell'>('shell');
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
   const [formError, setFormError] = useState('');
 
-  const token = sessionStorage.getItem('nebula_token') ?? '';
-  const authHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   const fetchJobs = async () => {
     try {
-      const resp = await fetch('/api/cron/jobs', { headers: authHeaders });
+      const resp = await authFetch('/api/cron/jobs');
       if (resp.ok) setJobs(await resp.json());
     } catch {}
     setIsLoading(false);
   };
 
-  useEffect(() => { fetchJobs(); }, []);
+  const fetchWorkflows = async () => {
+    try {
+      const resp = await authFetch('/api/workflows');
+      if (resp.ok) {
+        const data = await resp.json();
+        setWorkflows(data.map((w: any) => ({ id: w.id, name: w.name })));
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchJobs();
+    fetchWorkflows();
+  }, []);
 
   const fetchLogs = async (jobId: string) => {
     try {
-      const resp = await fetch(`/api/cron/jobs/${jobId}/logs`, { headers: authHeaders });
+      const resp = await authFetch(`/api/cron/jobs/${jobId}/logs`);
       if (resp.ok) {
         const data = await resp.json();
         setJobLogs((prev) => ({ ...prev, [jobId]: data }));
@@ -99,31 +128,36 @@ export const CrontabWindow: React.FC = () => {
   const handleRunNow = async (job: CronJob) => {
     setRunningJobs((prev) => new Set([...prev, job.id]));
     try {
-      const resp = await fetch(`/api/cron/jobs/${job.id}/run`, { method: 'POST', headers: authHeaders });
+      const resp = await authFetch(`/api/cron/jobs/${job.id}/run`, { method: 'POST' });
       if (resp.ok) {
         await fetchJobs();
         if (expandedJobId === job.id) await fetchLogs(job.id);
+        showToast(`Job "${job.name}" executado com sucesso.`);
       }
-    } catch {}
+    } catch {
+      showToast(`Falha ao executar job "${job.name}".`);
+    }
     setRunningJobs((prev) => { const n = new Set(prev); n.delete(job.id); return n; });
   };
 
   const handleTogglePause = async (job: CronJob) => {
     try {
-      await fetch(`/api/cron/jobs/${job.id}`, {
+      await authFetch(`/api/cron/jobs/${job.id}`, {
         method: 'PUT',
-        headers: authHeaders,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isPaused: !job.isPaused }),
       });
       await fetchJobs();
+      showToast(job.isPaused ? `Job "${job.name}" retomado.` : `Job "${job.name}" pausado.`);
     } catch {}
   };
 
   const handleDelete = async (jobId: string) => {
     if (!confirm('Remover este job cron?')) return;
     try {
-      await fetch(`/api/cron/jobs/${jobId}`, { method: 'DELETE', headers: authHeaders });
+      await authFetch(`/api/cron/jobs/${jobId}`, { method: 'DELETE' });
       await fetchJobs();
+      showToast('Job removido.');
     } catch {}
   };
 
@@ -131,25 +165,38 @@ export const CrontabWindow: React.FC = () => {
     setFormError('');
     if (!formName.trim()) { setFormError('Nome é obrigatório.'); return; }
     if (!cronValidate(formExpr)) { setFormError('Expressão cron inválida (5 campos separados por espaço).'); return; }
-    if (!formCommand.trim()) { setFormError('Comando é obrigatório.'); return; }
+    
+    let cmd = formCommand.trim();
+    if (commandType === 'workflow') {
+      if (!selectedWorkflowId) {
+        setFormError('Selecione um Mini-Workflow para o gatilho.');
+        return;
+      }
+      cmd = `workflow:${selectedWorkflowId}`;
+    }
+
+    if (!cmd) { setFormError('Comando é obrigatório.'); return; }
 
     try {
       if (editingJob) {
-        await fetch(`/api/cron/jobs/${editingJob.id}`, {
+        await authFetch(`/api/cron/jobs/${editingJob.id}`, {
           method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify({ name: formName, expression: formExpr, command: formCommand }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: formName, expression: formExpr, command: cmd }),
         });
+        showToast('Job atualizado com sucesso!');
       } else {
-        await fetch('/api/cron/jobs', {
+        await authFetch('/api/cron/jobs', {
           method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({ name: formName, expression: formExpr, command: formCommand }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: formName, expression: formExpr, command: cmd }),
         });
+        showToast('Job criado e agendado com sucesso!');
       }
       setShowCreateForm(false);
       setEditingJob(null);
       setFormName(''); setFormExpr('*/5 * * * *'); setFormCommand('');
+      setSelectedWorkflowId('');
       await fetchJobs();
     } catch { setFormError('Erro ao salvar job.'); }
   };
@@ -159,6 +206,13 @@ export const CrontabWindow: React.FC = () => {
     setFormName(job.name);
     setFormExpr(job.expression);
     setFormCommand(job.command);
+    if (job.command.startsWith('workflow:')) {
+      setCommandType('workflow');
+      setSelectedWorkflowId(job.command.replace('workflow:', ''));
+    } else {
+      setCommandType('shell');
+      setSelectedWorkflowId('');
+    }
     setShowCreateForm(true);
     setFormError('');
   };
@@ -167,19 +221,105 @@ export const CrontabWindow: React.FC = () => {
     setShowCreateForm(false);
     setEditingJob(null);
     setFormName(''); setFormExpr('*/5 * * * *'); setFormCommand('');
+    setSelectedWorkflowId('');
     setFormError('');
   };
 
+  // ─── Export / Backup ────────────────────────────────────────────────────────
+  const exportCrontabJSON = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(jobs, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute('href', dataStr);
+    a.setAttribute('download', `nebula_crontab_backup_${Date.now()}.json`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast('Crontab exportado como arquivo JSON.');
+  };
+
+  const saveBackupToWorkspace = async () => {
+    try {
+      const resp = await authFetch('/api/fs/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: 'crontab_backup.json',
+          content: JSON.stringify(jobs, null, 2),
+        }),
+      });
+      if (resp.ok) {
+        showToast('Backup salvo no Workspace em /crontab_backup.json!');
+      } else {
+        exportCrontabJSON();
+      }
+    } catch {
+      exportCrontabJSON();
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        if (Array.isArray(parsed)) {
+          let count = 0;
+          for (const item of parsed) {
+            if (item.name && item.expression && item.command) {
+              await authFetch('/api/cron/jobs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: item.name,
+                  expression: item.expression,
+                  command: item.command,
+                }),
+              });
+              count++;
+            }
+          }
+          await fetchJobs();
+          showToast(`${count} jobs importados com sucesso!`);
+        } else {
+          showToast('Formato inválido: esperado array de jobs cron.');
+        }
+      } catch (err: any) {
+        showToast(`Erro ao importar: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
-    <div className="flex flex-col h-full bg-[#060d1c] text-xs font-mono">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a2a4a] bg-[#080f1e]">
+    <div className="flex flex-col h-full bg-[#060d1c] text-xs font-mono relative">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImportFile}
+        accept=".json"
+        className="hidden"
+      />
+
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="absolute top-2 right-2 z-50 px-3 py-1.5 rounded bg-[#10b981] text-black font-semibold text-[11px] shadow-lg flex items-center gap-1.5 animate-in fade-in">
+          <CheckCircle className="w-3.5 h-3.5" />
+          {toastMsg}
+        </div>
+      )}
+
+      {/* Header & Action Toolbar */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a2a4a] bg-[#080f1e] flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-[#a78bfa]" />
           <span className="text-[#e6f0ff] font-semibold">Crontab — Agendador</span>
           <span className="text-[#4a6080] text-[10px]">({jobs.filter((j) => !j.isPaused).length}/{jobs.length} ativos)</span>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-1.5">
           <button
             onClick={fetchJobs}
             className="w-6 h-6 flex items-center justify-center rounded text-[#7a92b8] hover:text-[#e6f0ff] hover:bg-[#1a2a4a] transition-all"
@@ -187,9 +327,37 @@ export const CrontabWindow: React.FC = () => {
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
+
+          <button
+            onClick={saveBackupToWorkspace}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[#5eead4] hover:bg-[#5eead4]/15 border border-[#5eead4]/30 transition-all text-[10px]"
+            title="Salvar cópia de backup do crontab no workspace"
+          >
+            <HardDrive className="w-3 h-3" />
+            Salvar
+          </button>
+
+          <button
+            onClick={exportCrontabJSON}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[#7a92b8] hover:text-[#e6f0ff] hover:bg-[#1a2a4a] transition-all text-[10px]"
+            title="Baixar crontab em arquivo JSON"
+          >
+            <Download className="w-3 h-3" />
+            Exportar
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[#7a92b8] hover:text-[#e6f0ff] hover:bg-[#1a2a4a] transition-all text-[10px]"
+            title="Restaurar jobs a partir de arquivo JSON"
+          >
+            <Upload className="w-3 h-3" />
+            Importar
+          </button>
+
           <button
             onClick={() => { setShowCreateForm(true); setEditingJob(null); }}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-[#a78bfa]/15 hover:bg-[#a78bfa]/25 text-[#a78bfa] border border-[#a78bfa]/30 transition-all"
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#a78bfa]/15 hover:bg-[#a78bfa]/25 text-[#a78bfa] border border-[#a78bfa]/30 transition-all text-[10px] font-semibold"
           >
             <Plus className="w-3 h-3" />
             Novo Job
@@ -199,31 +367,30 @@ export const CrontabWindow: React.FC = () => {
 
       {/* Create/Edit Form */}
       {showCreateForm && (
-        <div className="border-b border-[#1a2a4a] bg-[#08101e] p-3 space-y-2">
+        <div className="border-b border-[#1a2a4a] bg-[#08101e] p-3 space-y-2.5 animate-in slide-in-from-top-2">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[#a78bfa] text-[10px] font-semibold">{editingJob ? 'EDITAR JOB' : 'NOVO JOB'}</span>
+            <span className="text-[#a78bfa] text-[10px] font-semibold">{editingJob ? 'EDITAR JOB' : 'NOVO JOB AGENDADO'}</span>
             <button onClick={cancelForm}><X className="w-3.5 h-3.5 text-[#4a6080] hover:text-[#e6f0ff]" /></button>
           </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[9px] text-[#4a6080] mb-0.5">NOME</label>
+              <label className="block text-[9px] text-[#4a6080] mb-0.5">NOME DO JOB</label>
               <input
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                placeholder="Meu job"
+                placeholder="Ex: Pulso diário de logs"
                 className="w-full bg-[#0a1628] border border-[#1a2a4a] rounded px-2 py-1 text-[#e6f0ff] focus:outline-none focus:border-[#a78bfa]/50"
               />
             </div>
             <div>
               <label className="block text-[9px] text-[#4a6080] mb-0.5">EXPRESSÃO CRON</label>
-              <div className="flex gap-1">
-                <input
-                  value={formExpr}
-                  onChange={(e) => setFormExpr(e.target.value)}
-                  placeholder="* * * * *"
-                  className="flex-1 bg-[#0a1628] border border-[#1a2a4a] rounded px-2 py-1 text-[#e6f0ff] focus:outline-none focus:border-[#a78bfa]/50"
-                />
-              </div>
+              <input
+                value={formExpr}
+                onChange={(e) => setFormExpr(e.target.value)}
+                placeholder="* * * * *"
+                className="w-full bg-[#0a1628] border border-[#1a2a4a] rounded px-2 py-1 text-[#e6f0ff] focus:outline-none focus:border-[#a78bfa]/50"
+              />
               <div className="flex gap-1 mt-1 flex-wrap">
                 {CRON_EXAMPLES.map((ex) => (
                   <button key={ex.expr} onClick={() => setFormExpr(ex.expr)}
@@ -233,27 +400,91 @@ export const CrontabWindow: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Trigger Type Toggle */}
           <div>
-            <label className="block text-[9px] text-[#4a6080] mb-0.5">COMANDO (shell)</label>
-            <input
-              value={formCommand}
-              onChange={(e) => setFormCommand(e.target.value)}
-              placeholder="echo hello world ou node /caminho/script.js"
-              className="w-full bg-[#0a1628] border border-[#1a2a4a] rounded px-2 py-1 text-[#e6f0ff] focus:outline-none focus:border-[#a78bfa]/50"
-            />
+            <label className="block text-[9px] text-[#4a6080] mb-1">TIPO DE GATILHO</label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setCommandType('workflow')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] border transition-all ${
+                  commandType === 'workflow'
+                    ? 'bg-[#f97316]/20 border-[#f97316] text-[#f97316]'
+                    : 'bg-[#0a1628] border-[#1a2a4a] text-[#7a92b8]'
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                Disparar Mini-Workflow
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommandType('shell')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] border transition-all ${
+                  commandType === 'shell'
+                    ? 'bg-[#3ba9ff]/20 border-[#3ba9ff] text-[#3ba9ff]'
+                    : 'bg-[#0a1628] border-[#1a2a4a] text-[#7a92b8]'
+                }`}
+              >
+                <Terminal className="w-3 h-3" />
+                Comando Shell / Script
+              </button>
+            </div>
+
+            {commandType === 'workflow' ? (
+              <div>
+                <label className="block text-[9px] text-[#4a6080] mb-0.5">SELECIONAR MINI-WORKFLOW</label>
+                {workflows.length === 0 ? (
+                  <div className="text-[10px] text-[#fbbf24] bg-[#fbbf24]/10 p-2 rounded border border-[#fbbf24]/30">
+                    Nenhum workflow salvo encontrado. Crie um workflow primeiro na janela "Mini-Workflows".
+                  </div>
+                ) : (
+                  <select
+                    value={selectedWorkflowId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedWorkflowId(id);
+                      setFormCommand(`workflow:${id}`);
+                      const found = workflows.find((w) => w.id === id);
+                      if (found && !formName) setFormName(`Workflow: ${found.name}`);
+                    }}
+                    className="w-full bg-[#0a1628] border border-[#1a2a4a] rounded px-2 py-1 text-[#e6f0ff] focus:outline-none focus:border-[#f97316]/50"
+                  >
+                    <option value="">-- Escolha um Mini-Workflow --</option>
+                    {workflows.map((wf) => (
+                      <option key={wf.id} value={wf.id}>
+                        {wf.name} ({wf.id})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[9px] text-[#4a6080] mb-0.5">COMANDO SHELL</label>
+                <input
+                  value={formCommand}
+                  onChange={(e) => setFormCommand(e.target.value)}
+                  placeholder="Ex: python scripts/timestamp_logger.py ou node server.js"
+                  className="w-full bg-[#0a1628] border border-[#1a2a4a] rounded px-2 py-1 text-[#e6f0ff] focus:outline-none focus:border-[#3ba9ff]/50"
+                />
+              </div>
+            )}
           </div>
+
           {formError && (
             <div className="flex items-center gap-1 text-[#ef4444] text-[10px]">
               <AlertCircle className="w-3 h-3" /> {formError}
             </div>
           )}
-          <div className="flex justify-end gap-2">
+
+          <div className="flex justify-end gap-2 pt-1">
             <button onClick={cancelForm} className="px-2 py-1 rounded text-[#7a92b8] hover:text-[#e6f0ff] hover:bg-[#1a2a4a] transition-all">
               Cancelar
             </button>
-            <button onClick={handleSave} className="flex items-center gap-1 px-2 py-1 rounded bg-[#a78bfa]/15 hover:bg-[#a78bfa]/25 text-[#a78bfa] border border-[#a78bfa]/30 transition-all">
+            <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 rounded bg-[#a78bfa]/20 hover:bg-[#a78bfa]/30 text-[#a78bfa] border border-[#a78bfa]/40 transition-all font-semibold">
               <Save className="w-3 h-3" />
-              {editingJob ? 'Salvar alterações' : 'Criar job'}
+              {editingJob ? 'Salvar alterações' : 'Salvar e Agendar'}
             </button>
           </div>
         </div>
@@ -312,9 +543,18 @@ export const CrontabWindow: React.FC = () => {
                         <span className="text-[#e6f0ff] truncate">{job.name}</span>
                         {job.isPaused && <span className="text-[9px] text-[#4a6080] border border-[#1a2a4a] rounded px-1">pausado</span>}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[#a78bfa] text-[9px]">{job.expression}</span>
-                        <span className="text-[#3a5a7a] text-[9px] truncate max-w-[140px]" title={job.command}>{job.command}</span>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[#a78bfa] text-[9px] font-semibold">{job.expression}</span>
+                        {job.command.startsWith('workflow:') ? (
+                          <span className="flex items-center gap-1 text-[#f97316] text-[9px] bg-[#f97316]/10 px-1.5 py-0.5 rounded border border-[#f97316]/30">
+                            <Zap className="w-2.5 h-2.5" />
+                            Workflow: {workflows.find((w) => w.id === job.command.replace('workflow:', ''))?.name || job.command.replace('workflow:', '')}
+                          </span>
+                        ) : (
+                          <span className="text-[#3a5a7a] text-[9px] truncate max-w-[220px]" title={job.command}>
+                            {job.command}
+                          </span>
+                        )}
                       </div>
                     </div>
 

@@ -299,4 +299,71 @@ return {'scaled': [n * multiplier for n in nums], 'total': sum(nums) * multiplie
       /Ciclo detectado no grafo do workflow/
     );
   });
+
+  test('Encadeia entrada e saída (I/O) entre nós sucessivos via $input, $json e items', async () => {
+    const nodes: WorkflowNode[] = [
+      { id: 'start', type: 'trigger', label: 'Trigger', x: 0, y: 0, config: {} },
+      {
+        id: 'producer',
+        type: 'code-box',
+        label: 'Fetch User Data',
+        x: 150,
+        y: 0,
+        config: { code: 'return { id: 42, username: "nebula_pilot", role: "admin", scores: [10, 20, 30] };' },
+      },
+      {
+        id: 'consumer_js',
+        type: 'code-box',
+        label: 'Process with JS',
+        x: 350,
+        y: -80,
+        config: {
+          code: 'return { greeting: "Hello " + $json.username, totalScore: $json.scores.reduce((a,b)=>a+b, 0), fromInput: $input.id };',
+        },
+      },
+      {
+        id: 'consumer_logger',
+        type: 'log-output',
+        label: 'Logger with Template',
+        x: 550,
+        y: -80,
+        config: {
+          message: 'User {{$json.greeting}} has score {{$json.totalScore}}',
+        },
+      },
+    ];
+
+    const connections: WorkflowConnection[] = [
+      { id: 'c1', sourceNodeId: 'start', targetNodeId: 'producer' },
+      { id: 'c2', sourceNodeId: 'producer', targetNodeId: 'consumer_js' },
+      { id: 'c3', sourceNodeId: 'consumer_js', targetNodeId: 'consumer_logger' },
+    ];
+
+    const wf: Workflow = {
+      id: 'wf_io_test',
+      name: 'I/O Piping Test',
+      nodes,
+      connections,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const result = await executeWorkflow(wf, {});
+    assert.strictEqual(result.status, 'success');
+
+    const jsRes = result.nodeResults.find((n) => n.nodeId === 'consumer_js');
+    assert.strictEqual(jsRes?.status, 'success');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(jsRes?.output)), {
+      greeting: 'Hello nebula_pilot',
+      totalScore: 60,
+      fromInput: 42,
+    });
+
+    const logRes = result.nodeResults.find((n) => n.nodeId === 'consumer_logger');
+    assert.strictEqual(logRes?.status, 'success');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(logRes?.output)), {
+      logged: 'User Hello nebula_pilot has score 60',
+    });
+  });
 });
+

@@ -167,7 +167,7 @@ export const TopBar: React.FC = () => {
     },
     {
       id: 'workflow',
-      label: 'Mini-n8n Workflows',
+      label: 'Mini-Workflows',
       icon: <Workflow className="w-4 h-4 text-[#f97316]" />,
       onClick: () => open('workflow'),
     },

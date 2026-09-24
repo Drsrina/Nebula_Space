@@ -292,7 +292,7 @@ export const CommandPaletteOverlay: React.FC = () => {
       {
         id: 'act-workflow',
         category: 'actions',
-        label: 'Abrir Workflow Engine (Mini-n8n)',
+        label: 'Abrir Mini-Workflows',
         sublabel: 'Automações e fluxos de dados visuais',
         icon: <WorkflowIcon className="w-4 h-4 text-[#ec4899]" />,
         onSelect: () => openOrFocus('workflow', 0),

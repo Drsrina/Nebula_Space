@@ -213,6 +213,27 @@ export function executeSandboxJS(code: string, context: Record<string, unknown>)
 }
 
 /**
+ * Interpolação de templates {{ $json.chave }} ou {{ trigger.prop }} em strings de configuração.
+ */
+export function interpolateTemplates(text: string, context: Record<string, unknown>): string {
+  if (!text || typeof text !== 'string') return text;
+  return text.replace(/\{\{\s*([\w$.]+)\s*\}\}/g, (_, expr) => {
+    try {
+      const parts = expr.split('.');
+      let current: any = context;
+      for (const p of parts) {
+        if (current == null) return '';
+        current = current[p];
+      }
+      if (current === undefined || current === null) return '';
+      return typeof current === 'object' ? JSON.stringify(current) : String(current);
+    } catch {
+      return '';
+    }
+  });
+}
+
+/**
  * Executa um trecho de script Python via subprocess isolado no host.
  */
 function executePythonScript(code: string, context: Record<string, unknown>): Promise<unknown> {
@@ -224,6 +245,9 @@ import json, sys
 raw = sys.stdin.read()
 context = json.loads(raw) if raw else {}
 trigger = context.get('trigger', {})
+input_data = context.get('$input')
+json_data = context.get('$json')
+items = context.get('items', [])
 
 def run():
 ${code.split('\n').map((l) => '    ' + l).join('\n')}
@@ -291,6 +315,7 @@ export async function executeWorkflow(
 
   // Ordena nós topologicamente
   const orderedNodes = topologicalSort(workflow.nodes, workflow.connections);
+  const nodeOutputs = new Map<string, unknown>();
 
   for (const node of orderedNodes) {
     if (skipNodes.has(node.id)) {
@@ -300,6 +325,43 @@ export async function executeWorkflow(
 
     const nodeStart = Date.now();
     progressCallback?.(node.id, 'running');
+
+    // Mapeamento de I/O: coletar saídas dos nós predecessores conectados
+    const incomingConns = workflow.connections.filter((c) => c.targetNodeId === node.id);
+    const incomingOutputs = incomingConns
+      .map((c) => nodeOutputs.get(c.sourceNodeId))
+      .filter((v) => v !== undefined);
+
+    let rawInput: unknown = null;
+    if (incomingOutputs.length === 1) {
+      rawInput = incomingOutputs[0];
+    } else if (incomingOutputs.length > 1) {
+      rawInput = incomingOutputs;
+    } else {
+      rawInput = flowContext['trigger'] ?? triggerPayload;
+    }
+
+    // Extrair $json do input (se for http-request { status, body }, extrai body)
+    let jsonPayload: unknown = rawInput;
+    if (rawInput && typeof rawInput === 'object' && 'body' in (rawInput as Record<string, unknown>)) {
+      jsonPayload = (rawInput as Record<string, unknown>).body;
+    }
+
+    const items = Array.isArray(jsonPayload)
+      ? jsonPayload
+      : jsonPayload !== null && jsonPayload !== undefined
+      ? [jsonPayload]
+      : [];
+
+    // Contexto de execução local do nó
+    const nodeContext: Record<string, unknown> = {
+      ...flowContext,
+      $input: rawInput,
+      $json: jsonPayload,
+      $prev: rawInput,
+      input: rawInput,
+      items,
+    };
 
     try {
       let output: unknown = null;
@@ -312,12 +374,24 @@ export async function executeWorkflow(
         }
 
         case 'http-request': {
-          const url = String(node.config.url ?? '');
-          const method = String(node.config.method ?? 'GET');
-          const headers = node.config.headers as Record<string, string> | undefined;
-          const body = node.config.body;
+          let url = String(node.config.url ?? '');
+          const method = String(node.config.method ?? 'GET').toUpperCase();
+          const headers = (node.config.headers as Record<string, string>) || {};
+          let body = node.config.body;
 
           if (!url) throw new Error('URL não configurada no nó HTTP Request');
+
+          // Interpolação de templates {{ $json.chave }} ou {{ trigger.prop }} na URL
+          url = interpolateTemplates(url, nodeContext);
+
+          // Se body for string, interpola variáveis
+          if (typeof body === 'string') {
+            const interpolated = interpolateTemplates(body, nodeContext);
+            try { body = JSON.parse(interpolated); } catch { body = interpolated; }
+          } else if (!body && ['POST', 'PUT', 'PATCH'].includes(method) && jsonPayload && typeof jsonPayload === 'object') {
+            // Repassa automaticamente o payload JSON do nó anterior se nenhum body for fornecido
+            body = jsonPayload;
+          }
 
           const response = await httpFetch(url, { method, headers, body });
           let parsedBody: unknown = response.body;
@@ -335,9 +409,9 @@ export async function executeWorkflow(
           if (!code.trim()) { output = null; break; }
 
           if (language === 'python') {
-            output = await executePythonScript(code, { ...flowContext });
+            output = await executePythonScript(code, nodeContext);
           } else {
-            output = executeSandboxJS(code, { ...flowContext });
+            output = executeSandboxJS(code, nodeContext);
           }
 
           flowContext[`${node.id}_result`] = output;
@@ -349,7 +423,7 @@ export async function executeWorkflow(
           const expression = String(node.config.expression ?? 'false');
           let condResult = false;
           try {
-            condResult = Boolean(executeSandboxJS(`return (${expression})`, { ...flowContext }));
+            condResult = Boolean(executeSandboxJS(`return (${expression})`, nodeContext));
           } catch {}
 
           output = { conditionMet: condResult };
@@ -386,12 +460,13 @@ export async function executeWorkflow(
         case 'discord-webhook': {
           const webhookUrl = String(node.config.webhookUrl ?? '');
           if (!webhookUrl) throw new Error('URL do Discord Webhook não configurada');
-          const content = String(
-            node.config.content ??
-            (typeof flowContext['result'] === 'string'
-              ? flowContext['result']
-              : JSON.stringify(flowContext['result'] ?? flowContext['response'] ?? flowContext, null, 2))
-          );
+          const rawContent = node.config.content ? String(node.config.content) : '';
+          const content = rawContent
+            ? interpolateTemplates(rawContent, nodeContext)
+            : (typeof jsonPayload === 'string'
+              ? jsonPayload
+              : JSON.stringify(jsonPayload ?? flowContext['result'] ?? flowContext, null, 2));
+
           const username = node.config.username ? String(node.config.username) : 'Nebula Workflow';
           const avatarUrl = node.config.avatarUrl ? String(node.config.avatarUrl) : undefined;
 
@@ -412,12 +487,13 @@ export async function executeWorkflow(
           const botToken = String(node.config.botToken ?? '');
           const chatId = String(node.config.chatId ?? '');
           if (!botToken || !chatId) throw new Error('Bot Token e Chat ID são obrigatórios no nó Telegram Bot');
-          const message = String(
-            node.config.message ??
-            (typeof flowContext['result'] === 'string'
-              ? flowContext['result']
-              : JSON.stringify(flowContext['result'] ?? flowContext['response'] ?? flowContext, null, 2))
-          );
+          const rawMessage = node.config.message ? String(node.config.message) : '';
+          const message = rawMessage
+            ? interpolateTemplates(rawMessage, nodeContext)
+            : (typeof jsonPayload === 'string'
+              ? jsonPayload
+              : JSON.stringify(jsonPayload ?? flowContext['result'] ?? flowContext, null, 2));
+
           const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
           const response = await httpFetch(telegramUrl, {
@@ -435,9 +511,10 @@ export async function executeWorkflow(
         }
 
         case 'log-output': {
-          const message = node.config.message
-            ? String(node.config.message)
-            : JSON.stringify(flowContext['result'] ?? flowContext['response'] ?? flowContext, null, 2);
+          const template = node.config.message ? String(node.config.message) : '';
+          const message = template
+            ? interpolateTemplates(template, nodeContext)
+            : JSON.stringify(jsonPayload ?? rawInput ?? flowContext['result'] ?? flowContext, null, 2);
           output = { logged: message };
           console.log(`[Nebula Workflow ${workflow.id}] Node ${node.label}:`, message);
           break;
@@ -445,6 +522,7 @@ export async function executeWorkflow(
       }
 
       const durationMs = Date.now() - nodeStart;
+      nodeOutputs.set(node.id, output);
       nodeResults.push({ nodeId: node.id, status: 'success', output, durationMs });
       progressCallback?.(node.id, 'success', output);
 
