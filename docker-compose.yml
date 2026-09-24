@@ -31,7 +31,7 @@ services:
 
       # ── Workspace ─────────────────────────────────────────────────────────
       # Pastas permitidas no servidor (separadas por : no Linux)
-      - NEBULA_ROOTS=/data:/workspace
+      - NEBULA_ROOTS=/:/workspace:/data
 
       # Modo somente-leitura (desabilita terminal e escrita de arquivos)
       - NEBULA_READONLY=false

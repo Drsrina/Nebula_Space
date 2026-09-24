@@ -16,8 +16,8 @@ services:
       - PORT=3000
       # Authentication token (leave empty to allow open access inside trusted VPN / LAN)
       - NEBULA_TOKEN=seu_token_secreto_aqui_12345
-      # Allowed root directories (colon-separated, e.g. /data:/workspace or /)
-      - NEBULA_ROOTS=/data:/workspace
+      # Allowed root directories (colon-separated, e.g. /:/workspace:/data)
+      - NEBULA_ROOTS=/:/workspace:/data
       # Optional read-only protection (true / false)
       - NEBULA_READONLY=false
     volumes:

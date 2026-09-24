@@ -5,3 +5,6 @@ dist
 .env
 .DS_Store
 *.log
+Arcadia-main
+n8n-master
+vscode-main

@@ -32,7 +32,8 @@ export function getAllowedRoots(): FSRoot[] {
 
   return list.map((r) => {
     const resolved = path.resolve(r);
-    const base = path.basename(resolved) || resolved;
+    const isRoot = resolved === '/' || (process.platform === 'win32' && /^[a-zA-Z]:\\$/.test(resolved));
+    const base = isRoot ? 'Raiz do Container' : (path.basename(resolved) || resolved);
     return {
       name: `${base} (${resolved})`,
       path: resolved,
