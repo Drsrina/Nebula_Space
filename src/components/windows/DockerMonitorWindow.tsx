@@ -39,6 +39,12 @@ export const DockerMonitorWindow: React.FC = () => {
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const showError = (msg: string) => {
+    setActionError(msg);
+    setTimeout(() => setActionError(null), 4000);
+  };
 
   const fetchContainers = async () => {
     setIsLoading(true);
@@ -81,10 +87,10 @@ export const DockerMonitorWindow: React.FC = () => {
         await fetchContainers();
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(`Erro ao executar ${action}: ${err.error || res.statusText}`);
+        showError(`Erro ao executar ${action}: ${err.error || res.statusText}`);
       }
     } catch (err: any) {
-      alert(`Falha de comunicação: ${err.message}`);
+      showError(`Falha de comunicação: ${err.message}`);
     } finally {
       setActionInProgress(null);
     }
@@ -128,6 +134,16 @@ export const DockerMonitorWindow: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-[#050b17] text-[#e6f0ff] font-sans overflow-hidden">
+      {/* Action error toast */}
+      {actionError && (
+        <div className="shrink-0 mx-4 mt-2 px-3 py-2 rounded-lg bg-[#ff5c7a]/15 border border-[#ff5c7a]/30 text-[11px] text-[#ff9aaa] font-mono flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-[#ff5c7a]" />
+          <span className="flex-1">{actionError}</span>
+          <button onClick={() => setActionError(null)} className="text-[#ff5c7a]/60 hover:text-[#ff5c7a]">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
       {/* Top Header & Stats */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#081224] border-b border-[#3ba9ff]/20">
         <div className="flex items-center gap-3">

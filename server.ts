@@ -48,7 +48,7 @@ async function startServer() {
     res.json({
       status: 'ok',
       service: 'nebula-filesystem-api',
-      version: '2.6.0',
+      version: '2.8.1',
       mode: isReadOnly ? 'readonly' : 'readwrite',
       authRequired,
       mfaEnabled,

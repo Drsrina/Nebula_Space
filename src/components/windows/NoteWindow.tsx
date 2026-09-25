@@ -68,8 +68,13 @@ export const NoteWindow: React.FC<NoteWindowProps> = ({ windowId, payload }) => 
     }
   }, [content, payload?.noteId, title, updateWindowPayload, windowId]);
 
-  // Auto-save effect with debounce
+  // Auto-save effect with debounce — skips the initial mount
+  const isFirstRender = React.useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setIsSaved(false);
     const timeout = setTimeout(() => {
       saveNoteImmediately();

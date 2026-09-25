@@ -55,15 +55,16 @@ export const LauncherWindow: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('files');
+  const [selectedIdx, setSelectedIdx] = useState(0);
 
   const { openWindow, createNote, bringToFront, windows, closeWindow, setWindowDepth } = useWindowsStore();
   const { openDirectoryPicker } = useFSStore();
   const { jumpToDepthPlane, toggleFocusMode, isFocusMode, toggleZMode, isZToggleMode, resetCamera } = useCanvasStore();
   const { openFileInEditor } = useEditorStore();
 
-  // Auto-switch to files tab when user types
+  // Auto-switch to files tab when user types + reset selection
   useEffect(() => {
-    if (searchTerm.trim()) setActiveTab('files');
+    if (searchTerm.trim()) { setActiveTab('files'); setSelectedIdx(0); }
   }, [searchTerm]);
 
   useEffect(() => {
@@ -166,6 +167,12 @@ export const LauncherWindow: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (!searchResults.length) return;
+              if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIdx((i) => Math.min(i + 1, searchResults.length - 1)); }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIdx((i) => Math.max(i - 1, 0)); }
+              else if (e.key === 'Enter') { e.preventDefault(); if (searchResults[selectedIdx]) handleOpenFile(searchResults[selectedIdx]); }
+            }}
             placeholder="Buscar arquivo... (Ctrl+P)"
             className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-[#050914] border border-[#3ba9ff]/30 focus:border-[#5eead4] text-[#e6f0ff] placeholder-[#506c94] text-xs outline-none shadow-[0_0_20px_rgba(59,169,255,0.1)] transition-all"
             autoFocus
@@ -212,7 +219,11 @@ export const LauncherWindow: React.FC = () => {
                 <button
                   key={idx}
                   onClick={() => handleOpenFile(item)}
-                  className="w-full flex items-center justify-between p-2 rounded-xl bg-[#091529]/60 hover:bg-[#3ba9ff]/15 border border-[#162744] hover:border-[#3ba9ff]/40 text-left transition-all group cursor-pointer"
+                  className={`w-full flex items-center justify-between p-2 rounded-xl border text-left transition-all group cursor-pointer ${
+                    idx === selectedIdx
+                      ? 'bg-[#3ba9ff]/20 border-[#3ba9ff]/50'
+                      : 'bg-[#091529]/60 hover:bg-[#3ba9ff]/15 border-[#162744] hover:border-[#3ba9ff]/40'
+                  }`}
                 >
                   <div className="flex items-center gap-2 truncate">
                     {item.isDir ? (

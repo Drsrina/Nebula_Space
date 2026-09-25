@@ -32,6 +32,7 @@ export const WebEmbedWindow: React.FC<WebEmbedWindowProps> = ({ payload }) => {
     }
     setActiveUrl(normalized);
     setInputUrl(normalized);
+    setHasError(false);
     const newHistory = [...history.slice(0, historyIndex + 1), normalized];
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
@@ -162,7 +163,7 @@ export const WebEmbedWindow: React.FC<WebEmbedWindowProps> = ({ payload }) => {
               ref={iframeRef}
               src={useProxy ? `/api/proxy/web?url=${encodeURIComponent(activeUrl)}` : activeUrl}
               className="w-full h-full border-0"
-              onLoad={() => setIsLoading(false)}
+              onLoad={() => { setIsLoading(false); setHasError(false); }}
               onError={() => {
                 setIsLoading(false);
                 setHasError(true);
@@ -170,23 +171,25 @@ export const WebEmbedWindow: React.FC<WebEmbedWindowProps> = ({ payload }) => {
               title="Web Embed"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
             />
-            {/* Overlay hint if blocked */}
-            <div className="absolute bottom-2 right-2 flex items-center gap-2 bg-[#060d1c]/90 backdrop-blur-md px-3 py-1 rounded-lg border border-[#1a2a4a] text-[10px] text-[#7a92b8]">
-              <span>Não carregou?</span>
-              <button
-                onClick={() => setUseProxy(!useProxy)}
-                className="text-[#3ba9ff] hover:underline"
-              >
-                {useProxy ? 'Tentar Direto' : 'Ativar Proxy'}
-              </button>
-              <span>•</span>
-              <button
-                onClick={() => window.open(activeUrl, '_blank')}
-                className="text-[#5eead4] hover:underline flex items-center gap-0.5"
-              >
-                Nova Aba <ExternalLink className="w-2.5 h-2.5" />
-              </button>
-            </div>
+            {/* Overlay hint — shown only when loading failed */}
+            {hasError && (
+              <div className="absolute bottom-2 right-2 flex items-center gap-2 bg-[#1a0a10]/95 backdrop-blur-md px-3 py-1 rounded-lg border border-[#ff5c7a]/30 text-[10px] text-[#ff9aaa]">
+                <span>⚠ Falha ao carregar</span>
+                <button
+                  onClick={() => setUseProxy(!useProxy)}
+                  className="text-[#3ba9ff] hover:underline"
+                >
+                  {useProxy ? 'Tentar Direto' : 'Ativar Proxy'}
+                </button>
+                <span>•</span>
+                <button
+                  onClick={() => window.open(activeUrl, '_blank')}
+                  className="text-[#5eead4] hover:underline flex items-center gap-0.5"
+                >
+                  Nova Aba <ExternalLink className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full bg-[#060d1c] text-[#4a6080] gap-3">

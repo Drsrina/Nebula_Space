@@ -12,7 +12,7 @@ interface TerminalLine {
 
 const WELCOME: TerminalLine[] = [
   { id: 'w1', type: 'info', content: '╭──────────────────────────────────────────────────╮' },
-  { id: 'w2', type: 'info', content: '│  Nebula Interactive Cloud Terminal • v2.7.7       │' },
+  { id: 'w2', type: 'info', content: '│  Nebula Interactive Cloud Terminal • v2.8.1       │' },
   { id: 'w3', type: 'info', content: '│  Shell Real no Container Docker (/bin/bash & sh)  │' },
   { id: 'w4', type: 'info', content: '╰──────────────────────────────────────────────────╯' },
   { id: 'w5', type: 'info', content: 'Comandos rápidos: ls -la, git status, pwd, cd, npm test' },
@@ -238,7 +238,7 @@ export const TerminalWindow: React.FC = () => {
       output: 'text-[#c8d9f0]',
     }[t]);
 
-  const QUICK_COMMANDS = ['ls -la', 'pwd', 'git status', 'node -v', 'npm test'];
+  const QUICK_COMMANDS = ['ls -la', 'pwd', 'git status', 'node -v', 'git log --oneline -5'];
 
   return (
     <div

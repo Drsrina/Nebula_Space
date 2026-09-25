@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Sparkles, Send, Trash2, Copy, Bot, User, Loader2 } from "lucide-react";
+import { Sparkles, Send, Trash2, Copy, Bot, User, Loader2, Check } from "lucide-react";
 import { useEditorStore } from "../../store/useEditorStore";
 import { authFetch } from "../../lib/api";
 
@@ -24,6 +24,7 @@ export const AiChatWindow: React.FC = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { activeTabPath, tabs } = useEditorStore();
@@ -100,8 +101,26 @@ export const AiChatWindow: React.FC = () => {
           </div>
         );
       }
-      return <span key={i} className="whitespace-pre-wrap">{part.replace(/\*\*(.*?)\*\*/g, "$1")}</span>;
+      // Render inline bold (**text**) and plain text
+      const segments = part.split(/(\*\*[^*]+\*\*)/g);
+      return (
+        <span key={i} className="whitespace-pre-wrap">
+          {segments.map((seg, j) =>
+            seg.startsWith("**") && seg.endsWith("**") ? (
+              <strong key={j} className="font-semibold text-[#e6f0ff]">{seg.slice(2, -2)}</strong>
+            ) : (
+              <span key={j}>{seg}</span>
+            )
+          )}
+        </span>
+      );
     });
+  };
+
+  const copyMessage = (id: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMsgId(id);
+    setTimeout(() => setCopiedMsgId(null), 2000);
   };
 
   return (
@@ -121,11 +140,11 @@ export const AiChatWindow: React.FC = () => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" style={{ scrollbarWidth: "thin", scrollbarColor: "#1b2c4d transparent" }}>
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+          <div key={msg.id} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"} group`}>
             <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${msg.role === "user" ? "bg-[#3ba9ff]/20" : "bg-[#a78bfa]/20"}`}>
               {msg.role === "user" ? <User className="w-3.5 h-3.5 text-[#3ba9ff]" /> : <Bot className="w-3.5 h-3.5 text-[#a78bfa]" />}
             </div>
-            <div className={`max-w-[85%] rounded-xl px-3 py-2 text-[12px] leading-relaxed ${msg.role === "user" ? "bg-[#0e1e3a] text-[#d1e0f5] rounded-tr-none" : "bg-[#080f20] text-[#c8d9f0] rounded-tl-none border border-[#0f1e38]"}`}>
+            <div className={`relative max-w-[85%] rounded-xl px-3 py-2 text-[12px] leading-relaxed ${msg.role === "user" ? "bg-[#0e1e3a] text-[#d1e0f5] rounded-tr-none" : "bg-[#080f20] text-[#c8d9f0] rounded-tl-none border border-[#0f1e38]"}`}>
               {msg.isLoading ? (
                 <div className="flex items-center gap-2 text-[#a78bfa]/60">
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -133,6 +152,16 @@ export const AiChatWindow: React.FC = () => {
                 </div>
               ) : (
                 renderContent(msg.content)
+              )}
+              {/* Copy button for assistant messages */}
+              {msg.role === "assistant" && !msg.isLoading && (
+                <button
+                  onClick={() => copyMessage(msg.id, msg.content)}
+                  className="absolute top-1.5 right-1.5 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-[#0f1e38] hover:bg-[#1b2f52] text-[#5e779d] hover:text-[#5eead4]"
+                  title="Copiar mensagem"
+                >
+                  {copiedMsgId === msg.id ? <Check className="w-2.5 h-2.5 text-[#5eead4]" /> : <Copy className="w-2.5 h-2.5" />}
+                </button>
               )}
             </div>
           </div>

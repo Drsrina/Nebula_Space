@@ -33,7 +33,7 @@ interface GraphNode {
 export const GraphWindow: React.FC = () => {
   const { currentPath, roots, readDir } = useFSStore();
   const { openWindow, windows } = useWindowsStore();
-  const { openFile } = useEditorStore();
+  const { openFileInEditor } = useEditorStore();
 
   const [treeData, setTreeData] = useState<GraphNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -152,8 +152,8 @@ export const GraphWindow: React.FC = () => {
       openWindow('file-browser', { path: node.path });
     } else {
       // Abre arquivo no Monaco Editor
-      openFile(node.path);
-      openWindow('editor', { path: node.path });
+      openFileInEditor({ path: node.path, name: node.name, content: '' });
+      openWindow('editor', {});
     }
   };
 
@@ -344,9 +344,11 @@ export const GraphWindow: React.FC = () => {
 
         {/* Floating Hint Overlay */}
         <div className="absolute bottom-3 left-3 bg-[#081224]/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#3ba9ff]/20 text-[10px] font-mono text-[#7a92b8] pointer-events-none flex items-center gap-2">
-          <span>💡 <strong>Clique numa Pasta:</strong> Abre no File Browser</span>
+          <span>💡 <strong>Pasta:</strong> Abre no File Browser</span>
           <span>•</span>
-          <span><strong>Clique num Arquivo:</strong> Abre no Monaco Editor</span>
+          <span><strong>Arquivo:</strong> Abre no Editor</span>
+          <span>•</span>
+          <span><strong>Alt+Clique:</strong> Colapsar/Expandir</span>
         </div>
       </div>
     </div>

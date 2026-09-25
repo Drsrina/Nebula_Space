@@ -179,7 +179,7 @@ export const Minimap: React.FC = () => {
 
             {/* Grid lines */}
             <line x1={MAP_W / 2} y1={0} x2={MAP_W / 2} y2={MAP_H} stroke="#1a2a4a" strokeWidth={0.5} />
-            <line x1={0} y1={MAP_H / 2} x2={MAP_W} y2={MAP_H} stroke="#1a2a4a" strokeWidth={0.5} />
+            <line x1={0} y1={MAP_H / 2} x2={MAP_W} y2={MAP_H / 2} stroke="#1a2a4a" strokeWidth={0.5} />
 
             {/* Window rectangles */}
             {windows

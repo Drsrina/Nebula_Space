@@ -345,8 +345,8 @@ export const TopBar: React.FC = () => {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold tracking-widest text-[#e6f0ff] uppercase">Nebula</span>
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#3ba9ff]/15 text-[#3ba9ff] border border-[#3ba9ff]/25">
-              v2.7.7
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#5eead4]/15 text-[#5eead4] border border-[#5eead4]/25">
+              v2.8.1
             </span>
           </div>
         </div>

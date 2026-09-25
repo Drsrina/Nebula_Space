@@ -58,7 +58,7 @@ export async function exportWorkspaceBackup(): Promise<boolean> {
 
     const backupData: NebulaBackupData = {
       app: 'nebula-workspace',
-      version: '2.7.6',
+      version: '2.8.1',
       exportedAt: new Date().toISOString(),
       workspace: {
         windows,
